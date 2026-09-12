@@ -4,13 +4,15 @@
 
 - The project is in product definition. Do not write application code during this phase.
 - All repository artifacts must be in English: code, comments, documentation, and folder and file names. A request written in another language does not change this rule.
-- Do not select an implementation stack during this phase. The user has explicitly selected Python 3.11+ for the server; all other stack choices remain open. Record necessary unresolved technical decisions as options under "Open questions" rather than selecting them.
+- Do not select an implementation stack during this phase. Python 3.11+ is selected for the server, and Tailscale is selected for private access. Other implementation stack choices remain open. Record necessary unresolved technical decisions as options under "Open questions" rather than selecting them.
 - Treat every item under "Backlog" as future work outside the MVP, never as an MVP requirement. Moving an item into scope requires explicit approval.
 - Every document created or updated for the initial documentation deliverables must end with an "Open questions" section listing unresolved decisions. If none remain, state that explicitly.
 
 ## Source of truth and workflow
 
 This project follows Spec-Driven Development. Specifications under `/specs` are the source of truth for application behavior. [Product requirements](docs/product/requirements.md) provide the approved product inputs for that specification work.
+
+Read documentation on demand: use [README.md](README.md) and [MVP scope](docs/product/scope.md) for orientation; for a specific task, read the relevant requirements and related specifications, following their links only as needed. Keep the feature-document reading order and workflow below.
 
 Before implementing a feature, read its documents in this order:
 
@@ -20,6 +22,8 @@ Before implementing a feature, read its documents in this order:
 4. `tasks.md`
 
 Follow the workflow: specification, design, plan, tasks, implementation, tests, and verification. Every implementation change must be traceable to an approved requirement. Every requirement and acceptance criterion must have corresponding tests before implementation is considered complete.
+
+Define product behavior in `spec.md`; resolve the relevant technical choices and contracts in `design.md` after the behavioral specification is approved, before planning and implementation. Establish shared technical decisions in the first relevant design and reuse them in dependent features.
 
 - Do not assume behavior absent from the specification or business contract. Clarify ambiguity before implementing the affected behavior.
 - Obtain approval before changing behavior, scope, or acceptance criteria. Wording corrections that preserve meaning may proceed without a new approval.
@@ -91,8 +95,13 @@ Tests are mandatory for acceptance criteria. Do not deliver new feature code wit
 
 ## Open questions
 
-- Which client technology, backend framework, storage technologies, and supporting libraries should be proposed for approval? Only server-side Python 3.11+ is selected.
+This section owns future technical decisions for the MVP. [Requirements](docs/product/requirements.md) defines product behavior, including the Windows validation range. Questions about future capabilities and their technologies belong to the [Backlog](docs/product/backlog.md#open-questions). Resolve the relevant questions in each feature's design; no option below selects a technology.
+
+- Which Windows client technology, Python backend framework, server storage technologies, and supporting libraries should be proposed for approval under the [platform and access constraints](docs/product/requirements.md#platform-and-access)?
+- Which communication contract should carry task operations and results: request/response communication, persistent communication, or a combination? How will it provide the required refresh behavior?
+- How should the server recognize repeated operation attempts, expose their results, and enforce task uniqueness consistently? Define the technical contract and persistence approach without changing the required rejection and retry behavior.
+- Which time representations and conversion approach should implement server timestamps and the fixed product time zone?
+- Which deployment tooling and detailed Tailscale configuration should provide private access and desktop connection setup?
 - Which test framework, formatter, linter, type checker, build commands, and CI checks should the project configure?
 - What structured logging schema and fields should the server use?
-- What concrete implementation folder and file architecture should future feature specifications define?
-- Which Windows window sizes and display-scaling settings must UI acceptance criteria cover?
+- What concrete implementation folder and file architecture should future feature specifications define within the existing layout?

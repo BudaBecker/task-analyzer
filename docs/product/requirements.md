@@ -1,78 +1,125 @@
 # MVP requirements
 
-These requirements record the approved product scope. Each ID provides a reference for future specifications and tests. Acceptance scenarios below describe expected outcomes; they are not executed tests. Unresolved behavior is listed under Open questions and must be settled before implementing the affected behavior.
+This document defines product behavior and acceptance scenarios for the [MVP scope](scope.md). Requirement IDs identify the inputs for future specifications and tests. The scenarios below are documentation, not executed tests.
 
-## Platform and account
+The Task Analyzer Server owns business rules, persistence, and calculations. The Desktop App collects input and presents server results. [User flows](user-flows.md) describes interaction sequences, and [Domain vocabulary](domain.md) defines shared terms.
 
-| ID | Requirement | Acceptance scenario |
-| --- | --- | --- |
-| REQ-001 | Provide a Windows desktop application for individual users managing personal work. | A user manages personal tasks and views their metrics in the Windows application. |
-| REQ-002 | Require an account for initial setup, then permit continued offline use on that installation. | After account setup, the user can work on tasks without connectivity. |
-| REQ-003 | Run the backend on a dedicated, self-hosted server using Python 3.11 or later. | The deployment design supports the specified hosting arrangement and minimum Python version; other implementation technologies remain undecided. |
-| REQ-004 | Maintain one authorized installation per account. A sign-in attempt on another PC must warn that an installation is already authorized and require explicit confirmation to replace it. | A second PC cannot replace the authorized installation without confirmation; confirmed replacement revokes the previous installation's cloud access. |
-| REQ-005 | Allow recovery of tasks, metrics, and settings from the latest cloud backup on the replacement installation. | After confirmed replacement, the user can restore the most recently backed-up data. Edits never saved to the cloud are not recovered from it. |
-| REQ-006 | Reject cloud writes from revoked installations. Rejected writes must not erase their local data. Reusing a revoked installation requires explicit replacement of the active installation and restoration from the cloud, with confirmation before discarding existing local edits. Do not merge installation histories in the MVP. | An old PC may continue working while offline, but its next cloud save is rejected. Its local edits remain until the user explicitly confirms their replacement during restoration. |
-
-## Tasks and local persistence
+## Platform and access
 
 | ID | Requirement | Acceptance scenario |
 | --- | --- | --- |
-| REQ-007 | A task has a required title, optional description/observations, optional deadline, pending/completed status, and an automatically determined priority state. | A task can be created with a title and no description or deadline; a task without a title cannot be created. |
-| REQ-008 | Allow users to create, edit, complete, reopen, and delete tasks. | A pending task can be edited and completed, then reopened; a deleted task is excluded from metrics. |
-| REQ-009 | Allow description/observation edits on completed tasks without reopening. Require reopening before changing the title, deadline, or reminder settings. Description edits preserve completion time and recorded priority. | Editing a completed task's observations leaves its completion measurements unchanged; editing its deadline requires reopening it. |
-| REQ-010 | Persist offline and unsaved edits locally so they survive closing and reopening the application. | A user closes the app after making edits without a cloud save; reopening retains those edits, including while offline. |
-| REQ-011 | Use a calendar date for the deadline. The cutoff is midnight immediately after that date in the account's time zone, initially taken from the setup machine. A pending task becomes overdue at the cutoff. | A task due on a given date remains within its deadline during that date and becomes overdue at the following midnight if incomplete. |
+| REQ-001 | Provide a Windows 11 Desktop App for personal task management and presentation of server-derived deadline emphasis and metrics. Windows 11 version 25H2 is the reference test environment. | The user manages personal tasks and reviews server results through the desktop in the Windows validation range defined by REQ-035. |
+| REQ-003 | Run the Task Analyzer Server on a dedicated, self-hosted server using Python 3.11 or later. | The deployment design supports dedicated self-hosting and the minimum Python version. |
+| REQ-027 | Serve one person's task collection without product accounts or authentication. Access to the dedicated server is private through Tailscale. | The user opens the desktop and accesses the personal task collection through the private connection without a product sign-in flow. |
 
-## Manual cloud backup
+## Tasks and server persistence
 
 | ID | Requirement | Acceptance scenario |
 | --- | --- | --- |
-| REQ-012 | Save tasks, metrics, and settings to the cloud only when the user invokes a manual save action, such as "Save to cloud." Automatic background synchronization is outside the MVP. | Local task edits persist without a cloud save; invoking the action while authorized and connected updates the cloud backup. |
-| REQ-013 | Visibly indicate local changes that have not been saved to the cloud. | A local change produces an unsaved-changes indication that remains while the change is absent from the cloud backup. |
-| REQ-014 | Email scheduling uses the latest task data available to the server. Local changes that have not been saved to the cloud may leave server reminders outdated. | Completing a task locally without saving it may still result in an email based on the server's incomplete version. |
+| REQ-007 | A task has a required title of at most 200 characters after trimming leading/trailing spaces, optional description/observations of at most 5,000 characters with line breaks allowed, an optional calendar-date deadline, and pending/completed status. Reject empty or whitespace-only titles. Past deadlines are allowed. New tasks are pending. | A title-only task is accepted as pending. The server accepts a 200-character title and 5,000-character observations, rejects 201 and 5,001 characters respectively, and rejects a blank title. A valid past deadline is accepted. |
+| REQ-008 | Allow creation, editing, completion, reopening, and deletion through the desktop. The server applies lifecycle rules and rejects changes that violate task validation or uniqueness. | A valid pending task can be edited, completed, and reopened. A rejected change leaves the task's persisted state unchanged. |
+| REQ-009 | Allow description/observation edits on completed tasks without reopening, preserving completion time. Require reopening before changing their title or deadline. | Editing a completed task's observations leaves its completion measurements unchanged; changing its deadline requires a successful reopening first. |
+| REQ-010 | Persist task data and lifecycle changes in the server. Changes confirmed as persisted survive closing/reopening the desktop and restarting the server. | After a successful save, restarting either component retains the task change. Desktop confirmation follows the operation-outcome rules in REQ-031. |
 
-## Reminders and priority
+## Time and deadlines
 
 | ID | Requirement | Acceptance scenario |
 | --- | --- | --- |
-| REQ-015 | For each task with a deadline, allow any combination of reminders 7, 3, and 1 calendar days before the deadline, or no reminders. Allow selection of the in-app channel, email, or both. | A user can select 7-day and 1-day reminders through both channels, or disable reminders for the task. |
-| REQ-016 | Schedule reminders at 09:00 in the account's time zone on each selected reminder date. | A 3-day reminder for a September 14 deadline becomes due at 09:00 on September 11 in the account's time zone. |
-| REQ-017 | Present in-app notifications in a notifications tab. Email reminders go to the account's registered email address and can be sent while the desktop application is closed. Previously generated in-app notifications remain available when it is reopened. | With the app closed, the server can send a scheduled email; reopening the app preserves previously generated in-app notifications. |
-| REQ-018 | Use exactly two priority states: non-priority by default, and priority when the first selected reminder becomes due. Promotion is automatic and independent of app availability or email delivery success. Do not allow manual priority changes. Tasks without reminders remain non-priority. | A task with 7-day and 1-day reminders becomes priority at the 7-day trigger even if email delivery fails; a task with no reminders stays non-priority. |
-| REQ-019 | Recalculate priority for pending tasks from their current deadline and selected reminders after relevant edits. Preserve priority at completion for metrics; recalculate it when reopened. | Moving a pending task's first reminder into the future returns it to non-priority. Completing it preserves its then-current priority for reporting. |
-| REQ-020 | When creation or rescheduling places selected reminder times in the past, immediately recalculate priority without sending retroactive email reminders. Future selected reminders still occur normally. | A task created after its selected 7-day trigger is immediately priority, receives no catch-up 7-day email, and remains eligible for its future selected 1-day reminder. |
+| REQ-028 | The server uses its clock to record original creation time and each completion time when applying the corresponding operation. Obtain the product time zone from the desktop during initial configuration and retain it in the server. The zone remains fixed in the MVP. Use server time in that zone to determine the current product date. | Changing the desktop's clock or time zone after initial configuration does not change server timestamps, deadline interpretation, or historical calculations. Restarting the server retains the configured zone. |
+| REQ-011 | Interpret a deadline as a calendar date whose cutoff is midnight immediately after that date in the product time zone. A pending task becomes overdue at the cutoff. A completion at or after the cutoff is late. | A September 14 deadline remains valid throughout September 14. At September 15, 00:00 in the product time zone, a pending task is overdue and a completion is late. |
+
+## Task uniqueness
+
+| ID | Requirement | Acceptance scenario |
+| --- | --- | --- |
+| REQ-029 | The server validates the resulting task state for uniqueness on creation, editing, and reopening. Compare titles without case differences or extra spaces, preserving accent differences. Apply the deadline/status rules below to different tasks; do not compare a task against itself. Deleted tasks do not participate. Reject a conflicting operation without changing either task and identify the conflict to the user. | A conflicting creation or edit is rejected. Reopening a completed task without a deadline is rejected if an equivalent pending task without a deadline already exists; the first task stays completed and the existing pending task is unchanged. |
+
+For title comparison, trim leading/trailing spaces and treat runs of internal spaces as one space. For example, `Read notes` and ` READ  NOTES ` are equivalent, while `Review résumé` and `Review resume` are different. This comparison rule does not make a title the task's identity.
+
+| Resulting task | Conflicting existing task |
+| --- | --- |
+| Has a deadline, pending or completed | A pending or completed task with an equivalent title and the same deadline date. |
+| Has no deadline and is pending | A pending task with an equivalent title and no deadline. |
+| Has no deadline and is completed | None: completed tasks without deadlines do not participate in uniqueness checks. |
+
+Acceptance examples for REQ-029:
+
+- Two tasks with equivalent titles and different deadline dates can coexist.
+- An undated task and a dated task with equivalent titles can coexist.
+- Completing an undated task allows another pending undated task with the same title to be created.
+- Completing a dated task does not free its title/date combination.
+- Deleting a task removes it from uniqueness checks.
+- Editing an existing task without changing its uniqueness combination does not conflict with that same task.
+
+## Commands, operation outcomes, and temporary input
+
+| ID | Requirement | Acceptance scenario |
+| --- | --- | --- |
+| REQ-030 | Creation and text/deadline edits require the user to select **Save**. **Complete** and **Reopen** submit their operations directly. **Delete** requires explicit confirmation identifying the task title and warning that deletion is permanent; confirmation immediately submits deletion without a separate save action. | Editing a title does not persist it before Save. Confirming deletion sends the operation immediately; cancelling confirmation sends no deletion. A successful deletion removes the task from the managed list and metrics. |
+| REQ-031 | Show an operation as successful only after server confirmation of persistence. While awaiting a response, show progress and prevent repeated submission of that operation. Distinguish server rejection from an unknown result. If no confirmation arrives within 15 seconds, show **Result not confirmed**. Retry must first consult the original operation's result; the server must recognize repeated attempts and prevent duplicate application. | A persisted operation whose response is lost is shown as unconfirmed after 15 seconds. Retrying obtains its result without creating another task or applying the transition again. A uniqueness rejection is a validation failure, not a successful retry of a different operation. |
+| REQ-032 | If the server is unavailable at startup, show the connection problem and **Retry**, keeping task operations unavailable until communication is established. Preserve form input in memory during failures while its window remains open. Closing a form or the app with unsent edits requires a warning about losing the input and explicit discard confirmation, with the option to cancel closing. Do not persist local drafts. On restart, load server-persisted state without automatically resending earlier changes. | A failed save leaves the typed input available in the open form. Cancelling a close warning preserves it; confirming discard closes the form without submitting those edits. Restarting the desktop restores only server-persisted data and submits no previous draft automatically. |
+
+A client timeout does not establish that the server rejected, cancelled, or rolled back an operation. Repeating the same attempt and creating a different task are separate cases: REQ-031 protects against applying one operation twice; REQ-029 rejects different tasks that violate uniqueness. The technical contract for identifying attempts and consulting their results belongs in the relevant design.
+
+## Visual deadline emphasis and refresh
+
+| ID | Requirement | Acceptance scenario |
+| --- | --- | --- |
+| REQ-026 | The server derives emphasis for pending tasks using the product date and deadline: **no deadline** when absent; **normal** when more than 3 calendar days remain; **due in 1-3 days** when 1, 2, or 3 calendar days remain; **due today** on the deadline date; **overdue** at or after its cutoff. Reevaluate after relevant edits or reopening. Completed tasks have a neutral **Completed** presentation, with their deadline date visible when present and no deadline urgency emphasis. | On September 11, pending tasks without a deadline, due September 15, due September 12-14, due September 11, and due September 10 receive the corresponding states. Completing an overdue task removes urgency emphasis while retaining its deadline and late completion for analysis. |
+| REQ-034 | Refresh task deadline emphasis and metrics after each confirmed operation, when opening or returning to the relevant view, and within 60 seconds after the date changes in the product time zone while server communication is available. Obtain calculated results from the server. | With the view open and communication available, a task due today becomes visibly overdue within 60 seconds of its cutoff. Returning to the metrics view requests current server results. A rejected reopening leaves the persisted task status and its contribution to metrics unchanged. |
 
 ## Productivity metrics
 
 | ID | Requirement | Acceptance scenario |
 | --- | --- | --- |
-| REQ-021 | Show task counts, average completion duration, average deadline-window percentage, and overdue rate, overall and grouped by non-priority/priority. Cover all task history in the MVP. | The user can inspect overall measurements and the corresponding measurements for each priority state. |
-| REQ-022 | Measure completion duration as completion time minus original creation time; average durations across completed, non-deleted tasks. | Tasks completed after 2 and 4 hours produce an average completion duration of 3 hours. Pending tasks do not enter this average. |
-| REQ-023 | Calculate each completed task's deadline-window percentage using the formula below. Show N/A without a deadline or if its cutoff is at or before creation. Average valid percentages of completed, non-deleted tasks for the aggregate indicator. | Completion halfway through a valid deadline window yields 50%; completion after 1.5 times that window yields 150%. An invalid or absent window is excluded from the average. |
-| REQ-024 | Measure overdue rate as the percentage of eligible tasks with deadlines that missed them: completed late or still incomplete after the deadline. Exclude tasks without deadlines and deleted tasks. Eligibility of future-deadline tasks in the denominator remains open. | A completed-late task and a pending task past its cutoff count as missed deadlines; a task without a deadline does not enter the calculation. Final denominator tests await the open decision. |
-| REQ-025 | Exclude deleted tasks from all metrics. Reopening removes a task from completed-task calculations until it is completed again, using its original creation time and latest completion time. Use current priority for pending tasks and preserved completion priority for completed tasks. | Reopening a task removes its prior completion duration and percentage from averages. Completing it again measures from its original creation time to the new completion time. |
+| REQ-021 | The server calculates total, pending, and completed task counts, average completion duration, average deadline-window percentage, and overdue rate across all task history. Present overall values without priority grouping. Total count equals pending plus completed, excluding deleted tasks. | Two pending and three completed tasks produce total 5, pending 2, and completed 3. Adding a deleted task does not change those values. |
+| REQ-022 | Measure completion duration as completion time minus original creation time. Average durations across completed, non-deleted tasks. | Tasks completed after 2 and 4 hours produce an average completion duration of 3 hours. Pending tasks do not enter the average. |
+| REQ-023 | Calculate each completed task's deadline-window percentage using the formula below. Show N/A without a deadline or if its cutoff is at or before creation. Average the valid percentages of completed, non-deleted tasks. Do not cap percentages at 100%. | Completion halfway through a valid window yields 50%; completion after 1.5 times that window yields 150%. Those two percentages average to 100%. Absent or invalid windows are excluded from the average. |
+| REQ-024 | Calculate overdue rate only from completed, non-deleted tasks with a deadline. The numerator counts those completed at or after their deadline cutoff; the denominator counts all completed, non-deleted tasks with a deadline, including those completed before a future cutoff. Exclude all pending tasks, including currently overdue ones. | One late completion among three completed tasks with deadlines produces 33.3% when displayed. Adding pending overdue tasks or completed tasks without deadlines does not change that rate. Completion exactly at the cutoff is late. |
+| REQ-025 | Exclude deleted tasks from every metric. A successful reopening removes a task from completed counts, duration/percentage averages, and overdue rate until it is completed again; it contributes to pending counts instead. On completion again, use original creation time and latest completion time. | Successfully reopening a task removes its previous completion measurements from the indicators. Completing it again measures from its original creation time to the new completion time. A rejected reopening preserves the existing measurements. |
 
 The deadline-window percentage is:
 
 ```text
-[(completion time - creation time) / (deadline cutoff - creation time)] * 100
+[(completion time - original creation time) / (deadline cutoff - original creation time)] * 100
 ```
 
-The deadline cutoff is defined in REQ-011. The percentage expresses how much of the available deadline window was consumed; it is not a task-progress percentage. Values above 100% indicate completion after the deadline. No cap at 100% is applied.
+The overdue rate is:
 
-## Scope exclusions
+```text
+[late completed tasks with deadlines / all completed tasks with deadlines] * 100
+```
 
-All items in [Backlog](backlog.md) are future possibilities, not MVP requirements. Additional task organization features also require an explicit scope decision. Python 3.11+ is selected for the server. Client languages, frameworks, databases, authentication technology, and deployment tooling remain undecided.
+Both formulas exclude deleted tasks. The deadline-window percentage expresses how much of the available window was consumed, not progress on the task. For a valid individual task window, exactly 100% means completion at the cutoff and is late; values above 100% are also late. Classify completion from timestamps, not from a rounded display value or an aggregate average.
+
+### Metric presentation
+
+| ID | Requirement | Acceptance scenario |
+| --- | --- | --- |
+| REQ-033 | Provide a dedicated metrics area with the task counts and three aggregate completion indicators, a pending/completed task chart, and an on-time/late completion chart using REQ-024's eligible population. Hovering over chart elements shows values and explanations. Apply the display rules below without changing full-precision calculations. | The dashboard shows the overall indicators and the two charts. Hovering reveals their values and meaning. A pending overdue task appears in pending counts but does not enter the on-time/late completion chart. |
+
+| Value | Display rule |
+| --- | --- |
+| Task counts | Whole numbers; an empty category displays 0. |
+| Average or rate with no eligible values | N/A. |
+| Percentages | One decimal place, rounding to the nearest value and upward at exact ties. |
+| Positive duration below one minute | `< 1 min`. |
+| Other durations | Complete days, hours, and minutes; discard remaining fractional minutes for presentation only. |
+
+For example, a computed 12.25% displays as 12.3%; 90 seconds displays as 1 minute. Calculate averages and classifications from the complete values before formatting.
+
+## Windows validation
+
+| ID | Requirement | Acceptance scenario |
+| --- | --- | --- |
+| REQ-035 | Use Windows 11 version 25H2 as the reference test environment, a 1920 × 1080 display with 16:9 aspect ratio, and 100%, 125%, and 150% display scaling. Support resizing from a minimum of 960 × 540 logical units to maximized. Content and controls must remain accessible throughout that range, with no clipping or overlapping that prevents use. | Verify the minimum and maximized window states and resizing between them at each scale. At 150%, the minimum logical dimensions correspond to 1440 × 810 physical pixels. Task actions, deadline information, and dashboard controls remain usable. |
+
+This is the MVP validation baseline. Broader desktop and responsiveness improvements belong to the [Backlog](backlog.md).
+
+## Scope boundary
+
+Only the requirements in this document define MVP behavior. [Scope](scope.md#mvp-boundaries) owns exclusions. The [Backlog](backlog.md) must not supply MVP requirements or acceptance criteria. Additional task organization features require an explicit scope decision.
 
 ## Open questions
 
-- **OQ-001 — Authentication and recovery:** How do registration, sign-in, email verification, password/account recovery, and sign-out work? What local access remains after explicit sign-out?
-- **OQ-002 — Installation replacement:** What information identifies the already authorized machine in the warning? What happens if replacement or restoration fails, or no cloud backup exists yet?
-- **OQ-003 — Notification lifecycle:** What are the retention and read/unread rules? How are in-app reminders generated or caught up while the app is closed/offline? Are catch-up in-app reminders created when selected reminder times already passed before task creation or rescheduling?
-- **OQ-004 — Reminder changes:** How should completion, reopening, deletion, channel changes, and repeated rescheduling affect existing notifications and future delivery? How are duplicate delivery and delivery failures handled?
-- **OQ-005 — Time-zone changes:** Can users change the account time zone after setup? How would changes affect existing deadlines, reminder schedules, and historical metrics?
-- **OQ-006 — Empty metrics:** What is displayed when there are no eligible values for a count, average, or rate? What duration units and percentage precision should be displayed?
-- **OQ-007 — Overdue denominator:** Do tasks with future deadlines enter the overdue-rate denominator immediately, or only after completion or reaching their cutoff? How is completion exactly at the cutoff classified?
-- **OQ-008 — Cloud-save lifecycle:** What feedback and retry behavior apply to failed saves? How are edits made during a save represented? How does the client receive server-generated notification information while task backup remains manual?
-- **OQ-009 — Detailed task interaction:** What validation limits apply to text and dates? Are deletion confirmation and recovery needed? What default reminder/channel selections apply to a new task?
-- **OQ-010 — Technical options:** With Python 3.11+ selected for the server, which Windows UI framework, local persistence mechanism, Python backend framework, database, authentication mechanism, and email delivery approach should be evaluated? These remaining options need a later comparison against the approved product behavior; none is selected.
+No unresolved MVP product-behavior decisions remain. Future technical decisions are owned by [AGENTS.md](../../AGENTS.md#open-questions) and must be addressed in the relevant design after its behavioral specification is approved.
