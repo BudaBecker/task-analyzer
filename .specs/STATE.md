@@ -13,7 +13,7 @@ No `AD-NNN` decisions have been recorded. Approved product inputs remain in [Req
 - **Next step**: Wait for a separate feature-specification request, then use the [MVP map](../docs/product/mvp-map.md) and relevant approved requirements to size that work.
 - **Blockers**: None for feature specification; [technical decisions](../AGENTS.md#open-questions) remain for the relevant Design work.
 - **Uncommitted files**: None at this handoff. Reconcile with `git status --porcelain` before acting.
-- **Branch**: `docs/tlc-integration`.
+- **Branch**: `main` after integrating `docs/tlc-integration`.
 
 ## Open questions
 
