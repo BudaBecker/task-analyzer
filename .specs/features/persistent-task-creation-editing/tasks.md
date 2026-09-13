@@ -1046,6 +1046,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 - [ ] It documents Tailscale Serve as the tailnet-only HTTPS front end for the loopback listener, a dedicated tailnet device name, and desktop device access, with no product sign-in.
 - [ ] It states that the actual tailnet hostname, device identifiers, interpreter version set, and host paths must be confirmed in an authorized environment, and that running any step requires explicit deployment authorization.
 - [ ] It carries the pending confirmation handed over by T2: the locked dependency set must be re-checked against the interpreter actually installed on the target before the service is considered deployable.
+- [ ] It records that the target is the user's own server, not a disposable validation host: every install, service, and Tailscale step needs authorization at the time it is run, the first `initialize_database` call is authorized separately, and existing state is backed up before it.
 - [ ] The private-access acceptance check for PCE-46 and PCE-47 is recorded as a pending authorized-environment verification, not as a performed check.
 - [ ] It ends with an `Open questions` section, per the repository document rule.
 - [ ] Gate check passes: the Build gate is run for the phase; links and scope boundaries are checked against the approved documents.
