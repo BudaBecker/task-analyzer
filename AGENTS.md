@@ -2,9 +2,9 @@
 
 ## Project phase and language
 
-- The product definition in `docs/product/` is consolidated and ready for feature specification work. Do not restart product definition or write application code during this phase.
+- The product definition in `docs/product/` is consolidated. Delivery 1A has an approved behavioral specification and is in Design. Do not restart product definition or write application code before the required Design and Tasks approvals.
 - All repository artifacts must be in English: code, comments, documentation, and folder and file names. A request written in another language does not change this rule.
-- Do not select an implementation stack during this phase. Python 3.11+ is selected for the server, and Tailscale is selected for private access. Other implementation stack choices remain open. Record necessary unresolved technical decisions as options under "Open questions" rather than selecting them.
+- Python 3.13+, FastAPI, SQLite on the dedicated Ubuntu Server 26.04.1 LTS host, and private Tailscale access are approved; see [AD-001](.specs/STATE.md#ad-001) and the raised runtime baseline in [AD-003](.specs/STATE.md#ad-003). Other technical choices require approval in the relevant Design. Record unresolved choices as options under "Open questions" rather than treating draft proposals as approved.
 - Treat every item under "Backlog" as future work outside the MVP, never as an MVP requirement. Moving an item into scope requires explicit approval.
 
 ## Source of truth and workflow
@@ -48,9 +48,9 @@ Future feature artifacts follow the applicable TLC templates and record unresolv
 ## Branches and authorization
 
 - Work on dedicated branches named `docs/<topic>`, `feat/<topic>`, or `fix/<topic>` according to the work's purpose.
-- Never commit unless the user explicitly requests it.
-- Repository authorization rules take precedence over TLC's automatic commit and pause-time commit/stash instructions. Specification or task approval does not authorize commits. When commits are requested, use TLC's atomic Conventional Commits and include task status and traceability updates with the corresponding change. Verification still runs when completed work remains uncommitted.
-- Installing or configuring TLC authorizes no application implementation, automatic commits, push, merge, releases, deployment, or database changes. Preserve outstanding work in place unless the user authorizes another action.
+- Follow TLC's commit standard: one atomic Conventional Commit per completed task, created without asking for a further approval. Mark the task complete in `tasks.md` and update traceability before that commit, and include those updates in the same commit. Never batch several tasks into one commit, and never commit work whose gate has not passed.
+- Task approval authorizes local implementation and its per-task commits on the work branch. Validate each message with TLC's `check_commit.py`. Verification still runs on uncommitted work when a task is interrupted.
+- Installing or configuring TLC authorizes no application implementation, push, merge, releases, deployment, or database changes. Preserve outstanding work in place unless the user authorizes another action.
 - Obtain explicit authorization before pushing, merging, publishing releases, deploying, or performing destructive operations that discard work or data.
 - Do not introduce unauthorized external libraries.
 - Do not change public function signatures, including names and parameters, without authorization.
@@ -70,7 +70,7 @@ Future feature artifacts follow the applicable TLC templates and record unresolv
 
 For server-side Python:
 
-- Require Python 3.11 or later.
+- Require Python 3.13 or later.
 - Use type annotations for all functions and methods, including parameters and return values.
 - Follow PEP 8 and clean-code principles.
 - Document modules, classes, functions, and methods using Google-style docstrings, including parameter documentation where applicable.
@@ -107,7 +107,7 @@ For future feature work, follow TLC's deterministic gates with a Python interpre
 | --- | --- |
 | `validate_spec.py <spec-path-or-feature>` | Before presenting an existing formal specification for approval; check required sections, EARS criteria, assumptions, and IDs. |
 | `validate_tasks.py <tasks-path-or-feature>` | Before formal task approval and again before Execute when `tasks.md` exists. |
-| `check_commit.py --message "<message>"` | Validate a proposed Conventional Commit only when the user has requested a commit. |
+| `check_commit.py --message "<message>"` | Validate each task's Conventional Commit message before committing it. |
 | `validate_state.py <feature>` | Before declaring a feature complete; checks the Verifier's PASS report and evidence. This does not validate `STATE.md`. |
 
 Run from the project root or pass the script's documented `--root` option. Fix nonzero gate results before proceeding. These scripts check structure; they do not replace requirement tests or semantic review. With no feature artifacts, report feature gates as not yet applicable.
@@ -118,7 +118,7 @@ Formal `tasks.md` must include the Test Coverage Matrix, Gate Check Commands, an
 
 This section owns future technical decisions for the MVP. [Requirements](docs/product/requirements.md) defines product behavior, including the Windows validation range. Questions about future capabilities and their technologies belong to the [Backlog](docs/product/backlog.md#open-questions). Resolve the relevant questions in each feature's design; no option below selects a technology.
 
-- Which Windows client technology, Python backend framework, server storage technologies, and supporting libraries should be proposed for approval under the [platform and access constraints](docs/product/requirements.md#platform-and-access)?
+- Which Windows client technology and remaining supporting libraries should be proposed for approval under the [platform and access constraints](docs/product/requirements.md#platform-and-access)? FastAPI, SQLite, and the Ubuntu server target are approved in [AD-001](.specs/STATE.md#ad-001); detailed proposals are in the [1A Design](.specs/features/persistent-task-creation-editing/design.md).
 - Which communication contract should carry task operations and results: request/response communication, persistent communication, or a combination? How will it provide the required refresh behavior?
 - How should the server recognize repeated operation attempts, expose their results, and enforce task uniqueness consistently? Define the technical contract and persistence approach without changing the required rejection and retry behavior.
 - Which time representations and conversion approach should implement server timestamps and the fixed product time zone?
