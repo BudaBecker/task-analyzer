@@ -6,7 +6,7 @@ This document maps MVP capabilities to responsible components, dependencies, and
 
 Begin with the Task Analyzer Server's persistent task lifecycle. The product rules for access, time, uniqueness, operation outcomes, deadline analysis, and desktop interaction are defined in the requirements and ready for feature specification work.
 
-Follow the [development workflow](../../AGENTS.md#source-of-truth-and-workflow): approve the behavioral specification, then resolve its technical choices and contracts in the design before planning and implementation. Establish shared decisions in the first relevant design and reuse them across dependent features.
+Follow the [development workflow](../../AGENTS.md#source-of-truth-and-workflow), **Specify → Design → Tasks → Execute**, sized to each feature's complexity. Future feature specifications belong in `.specs/features/`. Approve the behavioral specification, then resolve and approve its relevant technical choices and contracts in Design before Tasks and Execute. Establish shared decisions in the first relevant design and reuse them across dependent features.
 
 The map describes capability dependencies, not an implementation plan or a deployment topology. It does not assign new specification folder names or change the repository layout.
 
