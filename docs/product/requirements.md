@@ -9,7 +9,7 @@ The Task Analyzer Server owns business rules, persistence, and calculations. The
 | ID | Requirement | Acceptance scenario |
 | --- | --- | --- |
 | REQ-001 | Provide a Windows 11 Desktop App for personal task management and presentation of server-derived deadline emphasis and metrics. Windows 11 version 25H2 is the reference test environment. | The user manages personal tasks and reviews server results through the desktop in the Windows validation range defined by REQ-035. |
-| REQ-003 | Run the Task Analyzer Server on a dedicated, self-hosted server using Python 3.11 or later. | The deployment design supports dedicated self-hosting and the minimum Python version. |
+| REQ-003 | Run the Task Analyzer Server on a dedicated, self-hosted server using Python 3.13 or later. | The deployment design supports dedicated self-hosting and the minimum Python version. |
 | REQ-027 | Serve one person's task collection without product accounts or authentication. Access to the dedicated server is private through Tailscale. | The user opens the desktop and accesses the personal task collection through the private connection without a product sign-in flow. |
 
 ## Tasks and server persistence
@@ -21,12 +21,16 @@ The Task Analyzer Server owns business rules, persistence, and calculations. The
 | REQ-009 | Allow description/observation edits on completed tasks without reopening, preserving completion time. Require reopening before changing their title or deadline. | Editing a completed task's observations leaves its completion measurements unchanged; changing its deadline requires a successful reopening first. |
 | REQ-010 | Persist task data and lifecycle changes in the server. Changes confirmed as persisted survive closing/reopening the desktop and restarting the server. | After a successful save, restarting either component retains the task change. Desktop confirmation follows the operation-outcome rules in REQ-031. |
 
+For REQ-007, character limits count user-perceived characters, not bytes or Unicode code points. A letter with combining marks and a combined emoji each count as one user-perceived character. Title limits still apply after trimming leading/trailing spaces; the existing 200/201 and 5,000/5,001 acceptance cases remain unchanged.
+
 ## Time and deadlines
 
 | ID | Requirement | Acceptance scenario |
 | --- | --- | --- |
 | REQ-028 | The server uses its clock to record original creation time and each completion time when applying the corresponding operation. Obtain the product time zone from the desktop during initial configuration and retain it in the server. The zone remains fixed in the MVP. Use server time in that zone to determine the current product date. | Changing the desktop's clock or time zone after initial configuration does not change server timestamps, deadline interpretation, or historical calculations. Restarting the server retains the configured zone. |
 | REQ-011 | Interpret a deadline as a calendar date whose cutoff is midnight immediately after that date in the product time zone. A pending task becomes overdue at the cutoff. A completion at or after the cutoff is late. | A September 14 deadline remains valid throughout September 14. At September 15, 00:00 in the product time zone, a pending task is overdue and a completion is late. |
+
+For REQ-011, if midnight immediately after the deadline date occurs twice because of a time-zone transition, use its first occurrence. If that midnight does not exist, use the first valid instant of the following date. These exceptional cases do not change the ordinary September 14/15 acceptance scenario.
 
 ## Task uniqueness
 
