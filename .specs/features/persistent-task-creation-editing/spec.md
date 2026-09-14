@@ -61,6 +61,8 @@ Dependencies concern stable contracts; they do not require finishing implementat
 | Runtime baseline (PCE-44) | Require Python 3.13 or later instead of 3.11. | The user raised the minimum while approving the task plan; REQ-003 and PCE-44 were updated together and no other criterion changed. | Yes, 2026-09-13. |
 | Character counting (TXT-01) | Count user-perceived characters for title and observation bounds, not Unicode code points. | User explicitly selected visual character counting when the wire contract was detailed. | Yes, clarified during Design on 2026-09-13. |
 | Exceptional midnight (TIME-01) | Use the first occurrence of a repeated cutoff midnight; if absent, use the first valid instant of the following date. | User explicitly approved this interpretation of REQ-011's calendar cutoff. | Yes, clarified during Design on 2026-09-13. |
+| Skipped following date (TIME-02) | Use the first existing instant after the skipped date. | User approved the Pacific/Apia example during audit correction; see [context.md](context.md). | Yes, 2026-09-13. |
+| Deadline range (TIME-03) | Accept calendar deadlines from `0001-01-01` through `9999-12-30`, inclusive. | User approved excluding `9999-12-31` so next-day cutoffs remain representable; no other original scenario changes. | Yes, 2026-09-13. |
 
 **Open questions: none for the behavioral scope of delivery 1A.** Technical questions remain explicitly deferred in the final Open questions section. No unconfirmed behavioral defaults are adopted. The lesson script returned no confirmed lessons on 2026-09-13.
 
@@ -83,10 +85,12 @@ All stories below are P1/MVP. `PCE-NN` identifies a feature-local acceptance cri
 5. WHEN observations have exactly 5,000 characters THEN the server SHALL accept those observations. **PCE-05; REQ-007.**
 6. IF observations exceed 5,000 characters THEN the server SHALL reject the operation. **PCE-06; REQ-007.**
 7. WHEN accepted observations contain line breaks THEN the server SHALL retain those line breaks in the task's observations. **PCE-07; REQ-007, REQ-010.**
-8. WHEN a valid calendar-date deadline is supplied THEN the server SHALL retain that calendar date as the task's deadline. **PCE-08; REQ-007, REQ-011.**
-9. WHEN a valid deadline precedes the current product date THEN the server SHALL accept the past deadline. **PCE-09; REQ-007.**
+8. WHEN a valid calendar-date deadline within the supported range is supplied THEN the server SHALL retain that calendar date as the task's deadline. **PCE-08; REQ-007, REQ-011.**
+9. WHEN a valid deadline within the supported range precedes the current product date THEN the server SHALL accept the past deadline. **PCE-09; REQ-007.**
 10. IF a supplied deadline is not a valid calendar date THEN the server SHALL reject the operation. **PCE-10; REQ-007.**
 11. The server SHALL count user-perceived characters when enforcing title and observation length limits. **PCE-48; REQ-007.**
+12. WHEN a valid deadline is either `0001-01-01` or `9999-12-30` THEN the server SHALL accept that deadline subject to the other applicable task rules. **PCE-51; REQ-007.**
+13. IF a deadline is outside the inclusive `0001-01-01` through `9999-12-30` range THEN the server SHALL reject the operation without changing task state. **PCE-52; REQ-007, REQ-008.**
 
 **Independent Test:** Against an isolated server test setup, submit a title-only task; titles at 200 and 201 characters after trimming; empty and whitespace-only titles; observations at 5,000 and 5,001 characters; multiline observations; and absent, valid past, and invalid calendar-date deadlines. Inspect the returned outcomes and persisted task values. No desktop is needed to verify these server rules. Add visual-character cases at the same limits: each letter plus combining marks and each combined emoji counts as one character. Preserve the original boundary cases and their expected outcomes.
 
@@ -147,9 +151,9 @@ All stories below are P1/MVP. `PCE-NN` identifies a feature-local acceptance cri
 8. WHEN the server restarts after initial configuration THEN the server SHALL retain the configured product time zone. **PCE-35; REQ-028.**
 9. WHEN persisted tasks are requested after closing and reopening the desktop THEN the server SHALL make their persisted state available. **PCE-36; REQ-010.**
 10. WHEN the cutoff midnight occurs twice because of a product-zone transition THEN the server SHALL use its first occurrence. **PCE-49; REQ-011.**
-11. WHEN the cutoff midnight does not exist because of a product-zone transition THEN the server SHALL use the first valid instant of the following date. **PCE-50; REQ-011.**
+11. WHEN the cutoff midnight does not exist because of a product-zone transition THEN the server SHALL use the first valid instant at or after that nominal calendar boundary, including after the following date if that entire date is skipped. **PCE-50; REQ-011.**
 
-**Independent Test:** Set a known initial product zone, create and edit a task, and compare task state and configured zone across a server restart and a fresh client session. Vary the client's clock and zone while keeping the server reference controlled. Preserve the approved September 14 deadline example: valid throughout September 14; overdue at September 15, 00:00 in the product zone. Add repeated-midnight and missing-midnight fixtures with independently established expected instants. This checks cutoff semantics, not emphasis categories or UI refresh. The companion completion-at-cutoff scenario belongs to 1B and analysis coverage.
+**Independent Test:** Set a known initial product zone, create and edit a task, and compare task state and configured zone across a server restart and a fresh client session. Vary the client's clock and zone while keeping the server reference controlled. Preserve the approved September 14 deadline example: valid throughout September 14; overdue at September 15, 00:00 in the product zone. Add repeated-midnight and missing-midnight fixtures with independently established expected instants, including the skipped `2011-12-30` date in `Pacific/Apia`: a December 29 deadline expires at `2011-12-30T10:00:00Z`. Test both supported date endpoints with UTC and positive/negative-offset zones, and rejection of `9999-12-31` on creation and editing. This checks cutoff semantics, not emphasis categories or UI refresh. The companion completion-at-cutoff scenario belongs to 1B and analysis coverage.
 
 ### P1: Recover original operation results without duplicate application
 
@@ -222,8 +226,8 @@ The following are verification obligations linked to existing criteria, not addi
 | Requirement ID | Acceptance criteria / story | Coverage in 1A and remaining allocation | Phase | Status |
 | --- | --- | --- | --- | --- |
 | REQ-003 | PCE-44, PCE-45 | Server runtime/self-hosting constraints. Technical design and implementation verification pending. | Specify | Pending |
-| REQ-007 | PCE-01 through PCE-10, PCE-11, PCE-14 through PCE-16, PCE-48 | Task fields, visual-character bounds, pending creation, and pending edits. Completed-task behavior belongs to 1B; input UI belongs to desktop. | Specify | Pending |
-| REQ-008 | PCE-01, PCE-11, PCE-12, PCE-14 through PCE-16, PCE-27 | Creation and pending edits only. Remaining lifecycle operations belong to 1B; end-to-end actions require desktop. | Specify | Pending |
+| REQ-007 | PCE-01 through PCE-10, PCE-11, PCE-14 through PCE-16, PCE-48, PCE-51, PCE-52 | Task fields, visual-character bounds, pending creation, and pending edits. Completed-task behavior belongs to 1B; input UI belongs to desktop. | Specify | Pending |
+| REQ-008 | PCE-01, PCE-11, PCE-12, PCE-14 through PCE-16, PCE-27, PCE-52 | Creation and pending edits only. Remaining lifecycle operations belong to 1B; end-to-end actions require desktop. | Specify | Pending |
 | REQ-010 | PCE-07, PCE-11, PCE-16, PCE-34, PCE-36, PCE-37, PCE-40 | Durability of this delivery's operations. Extend to 1B operations and verify desktop confirmation separately. | Specify | Pending |
 | REQ-011 | PCE-08, PCE-32, PCE-33, PCE-49, PCE-50 | Calendar-date cutoff, exceptional midnight, and pending overdue semantics. Completion-at-cutoff and presentation are verified in dependent features. | Specify | Pending |
 | REQ-028 | PCE-13, PCE-28 through PCE-31, PCE-35 | Original creation, server time, and retained fixed zone. Completion timestamps belong to 1B; initial-zone collection UI belongs to desktop. | Specify | Pending |
@@ -231,7 +235,7 @@ The following are verification obligations linked to existing criteria, not addi
 | REQ-031 | PCE-26, PCE-37 through PCE-43 | Server outcomes, lookup, and safe repetition for creation/edit. 1B extends operation coverage; desktop owns progress, 15 seconds, Retry sequencing, and presentation. | Specify | Pending |
 | REQ-027 | PCE-46, PCE-47 | Server personal/private-access constraints. Detailed setup belongs to Design and the desktop access scenario remains pending. | Specify | Pending |
 
-**Coverage:** 9 active product IDs mapped to 50 acceptance criteria. PCE-01 through PCE-47 retain their IDs and wording; PCE-48 through PCE-50 record the user's explicit Design-time behavioral clarifications. No requirement is marked Verified. No implementation tasks or executable tests have been created. Every acceptance criterion must acquire requirement-derived tests and evidence during the authorized Tasks/Execute work; the Independent Test descriptions above are planned scenarios, not test results.
+**Coverage:** 9 active product IDs mapped to 52 acceptance criteria. All existing IDs and protected scenario inputs/outcomes are retained. PCE-08/09 and PCE-50 now reflect the audit clarifications explicitly approved by the user; PCE-51/52 add deadline-range criteria. PCE-48/49 preserve the earlier visual-counting and repeated-midnight clarifications. No requirement is marked Verified. No implementation tasks or executable tests have been created. Every acceptance criterion must acquire requirement-derived tests and evidence during the authorized Tasks/Execute work; the Independent Test descriptions above are planned scenarios, not test results.
 
 The remaining active MVP requirements are allocated outside 1A: REQ-009 to 1B; REQ-021 through REQ-025 and REQ-033 to analysis/dashboard; REQ-026 to deadline emphasis/presentation; REQ-001, REQ-030, REQ-032, and REQ-035 to desktop work, with deletion's server effects in 1B; and REQ-034 to derived-result and desktop refresh work. Cross-feature scenarios must retain their original product IDs and expectations.
 

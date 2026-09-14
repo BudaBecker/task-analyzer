@@ -33,15 +33,15 @@ Approved product inputs remain in [Requirements](../docs/product/requirements.md
 
 ## Handoff
 
-- **Feature**: [Persistent task creation and editing](features/persistent-task-creation-editing/spec.md), delivery 1A of the server lifecycle group.
-- **Phase / Task**: Tasks drafted and revised; awaiting user approval. No implementation has started and no task is in progress.
-- **Completed**: Approved 1A specification; approved detailed Design (2026-09-13) recorded in [AD-002](#ad-002); formal `tasks.md` with 31 atomic tasks in 9 phases. On 2026-09-13 the user also adopted TLC's commit standard in [AGENTS.md](../AGENTS.md#branches-and-authorization), confirmed that no MCP server or additional skill is needed, and raised the runtime baseline to Python 3.13+ ([AD-003](#ad-003)), propagated to REQ-003, PCE-44, the design, and T1/T2.
-- **In-progress** (file:line): `features/persistent-task-creation-editing/tasks.md:19` marks the task plan as Draft awaiting approval. `python .ai/skills/tlc-spec-driven/scripts/validate_tasks.py` reports 0 errors and 4 expected `Tests: none` warnings for the packaging and deployment-asset tasks.
-- **Next step**: Obtain task approval, then answer the sub-agent offer at Execute (31 tasks pack into more than one batch) before implementing T1. Each completed task now ends in its own atomic Conventional Commit.
-- **Deployment target**: The user's own Ubuntu server, confirmed 2026-09-13. No disposable validation host is used, so PCE-46/PCE-47 evidence and every install, service, Tailscale, and database-initialization step wait for step-level authorization and the host values the user still has to supply.
-- **Blockers**: None for task approval. Exact dependency versions are resolved in T2 against the interpreter the Ubuntu target provides; the private-access checks in PCE-46/47 need an explicitly authorized environment and are not performed by any task.
-- **Uncommitted files**: `AGENTS.md`, `README.md`, `docs/product/requirements.md`, and `.specs/STATE.md` modified; `spec.md`, `design.md`, and `tasks.md` are present in the untracked feature directory. No commit has been made for this work; the new commit standard applies to task execution.
-- **Branch**: `docs/persistent-task-creation-editing`. Git history ends at `2fafba2`; reconcile Git again on resume rather than relying on earlier conversational snapshots.
+- **Feature**: [Persistent task creation and editing](features/persistent-task-creation-editing/spec.md), delivery 1A.
+- **Phase / Task**: Documentation audit correction; no application task has started.
+- **Completed**: Documentation step D1: the user approved TIME-02 (entirely skipped following date) and TIME-03 (deadline range). Requirements, spec, context, design and task scenarios are synchronized; 52 PCE criteria retain all prior IDs and protected examples.
+- **Checks**: `validate_spec.py`: 0 errors, 0 warnings. `validate_tasks.py`: 0 errors, 4 expected packaging/deployment warnings. No application tests or deployment checks have run.
+- **Next step**: Documentation step D2: correct gates, dependency order, HTTP infrastructure, installed-package verification and stale project status; validate and commit locally.
+- **Authorization**: The user authorized documentation corrections and local commits only. Design revisions and implementation tasks are not approved for execution by this request.
+- **Deployment target**: The user's own Ubuntu server. Actual interpreter compatibility and private-access evidence remain pending separately authorized checks.
+- **Uncommitted files**: D1 changes are included in the commit carrying this snapshot; reconcile Git on resume.
+- **Branch**: `docs/1a-audit-corrections`, based on merged `main` at `c052f35`.
 
 ## Open questions
 

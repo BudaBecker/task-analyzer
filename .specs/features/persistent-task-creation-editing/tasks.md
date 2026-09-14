@@ -316,7 +316,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 **Where**: `src/task-analyzer-server/task_analyzer_server/domain.py`
 **Depends on**: T2
 **Reuses**: The design's text-bounds rules and stable field-error codes.
-**Requirement**: PCE-01 through PCE-10, PCE-15, PCE-16, PCE-48; REQ-007, REQ-008, REQ-011.
+**Requirement**: PCE-01 through PCE-10, PCE-15, PCE-16, PCE-48, PCE-51, PCE-52; REQ-007, REQ-008, REQ-011.
 
 **Tools**:
 
@@ -327,7 +327,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 - [ ] The title is counted in extended grapheme clusters after trimming leading and trailing spaces; an empty or whitespace-only title is rejected as `TITLE_REQUIRED` independently of the limit.
 - [ ] A 200-cluster title is accepted and 201 rejected as `TITLE_TOO_LONG`; 5,000-cluster observations are accepted and 5,001 rejected as `OBSERVATIONS_TOO_LONG`; observations are counted as supplied with line breaks preserved.
-- [ ] Absent observations and an absent deadline are accepted; a valid past calendar date is accepted; a non-calendar date is rejected as `INVALID_DEADLINE`.
+- [ ] Absent observations and an absent deadline are accepted; a valid past calendar date in the supported range is accepted; a non-calendar or out-of-range date is rejected as `INVALID_DEADLINE`. Tests accept both `0001-01-01` and `9999-12-30` and reject `9999-12-31`; range checks occur before cutoff arithmetic.
 - [ ] Accepted input is never truncated, and counting stops once a limit is exceeded.
 - [ ] Unit tests cover each criterion with both the original simple-text fixtures and combined-character fixtures: a base letter with combining marks and a joined emoji sequence each count as one character.
 - [ ] Gate check passes: `python -m pytest tests/server/unit`.
@@ -404,7 +404,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 **Where**: `src/task-analyzer-server/task_analyzer_server/clock.py` (modify)
 **Depends on**: T9
 **Reuses**: T9's conversion helpers; the design's fold and gap resolution procedure.
-**Requirement**: PCE-32, PCE-33, PCE-49, PCE-50; REQ-011.
+**Requirement**: PCE-32, PCE-33, PCE-49, PCE-50, PCE-51, PCE-52; REQ-011.
 
 **Tools**:
 
@@ -414,10 +414,10 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 **Done when**:
 
 - [ ] The cutoff is the next calendar date's local midnight in the product zone converted to UTC, never the deadline start plus 24 hours.
-- [ ] A repeated midnight resolves to its first UTC occurrence; an absent midnight resolves to the first valid instant of the following date, located by bracketing the transition with integer-microsecond bisection rather than by adding an offset difference.
-- [ ] Resolved instants are validated against the intended calendar boundary before being returned.
+- [ ] A repeated midnight resolves to its first UTC occurrence; an absent midnight resolves to the first valid instant at or after the nominal next-day boundary, including after a wholly skipped date, located by bracketing the transition with integer-microsecond bisection rather than by adding an offset difference.
+- [ ] Resolved instants are validated against the intended calendar boundary before being returned, including the preceding-microsecond check. Fixtures cover the supported date endpoints with UTC and positive/negative-offset zones. No overflow may become an invented cutoff or an accepted out-of-range deadline.
 - [ ] A pending task whose cutoff has been reached is reported as overdue under the deadline semantics; no emphasis category and no grace period are introduced.
-- [ ] Unit tests preserve the approved September 14 example: valid throughout September 14 and overdue at September 15 00:00 in the product zone. Repeated-midnight and missing-midnight fixtures use expected instants from independently checked zone-transition data, never from calling the helper under test.
+- [ ] Unit tests preserve the approved September 14 example: valid throughout September 14 and overdue at September 15 00:00 in the product zone. Repeated-midnight and missing-midnight fixtures use expected instants from independently checked zone-transition data, never from calling the helper under test. A `2011-12-29` deadline in `Pacific/Apia` resolves to `2011-12-30T10:00:00.000000Z`, skipping the absent December 30 local date.
 - [ ] Gate check passes: `python -m pytest tests/server/unit`.
 - [ ] Test count: at least 12 tests pass in `tests/server/unit/test_clock_cutoff.py` (no silent deletions).
 
@@ -676,7 +676,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 **Where**: `src/task-analyzer-server/task_analyzer_server/services.py` (modify)
 **Depends on**: T17, T15, T7
 **Reuses**: T17's runner, T15's task storage, and T7's validation.
-**Requirement**: PCE-01 through PCE-10, PCE-28, PCE-37, PCE-48; REQ-007, REQ-008, REQ-010, REQ-028.
+**Requirement**: PCE-01 through PCE-10, PCE-28, PCE-37, PCE-48, PCE-51, PCE-52; REQ-007, REQ-008, REQ-010, REQ-028.
 
 **Tools**:
 
@@ -689,7 +689,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 - [ ] Creation time is sampled from the server clock after write access is acquired, and the task receives a server-generated UUID identity.
 - [ ] A validation rejection stores its terminal result and creates no task.
 - [ ] Success is reported only after the mutation and its result commit together.
-- [ ] Integration tests carry the approved boundary fixtures through the command, including 200/201 title clusters, 5,000/5,001 observation clusters, whitespace-only titles, invalid calendar dates, and combined-character cases.
+- [ ] Integration tests carry the approved boundary fixtures through the command, including 200/201 title clusters, 5,000/5,001 observation clusters, whitespace-only titles, invalid calendar dates, combined-character cases, both accepted date endpoints, and rejected `9999-12-31`.
 - [ ] Gate check passes: `python -m pytest tests/server`.
 - [ ] Test count: at least 20 tests pass in `tests/server/integration/test_services_create.py` (no silent deletions).
 
@@ -706,7 +706,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 **Where**: `src/task-analyzer-server/task_analyzer_server/services.py` (modify)
 **Depends on**: T19
 **Reuses**: T19's shared validation and application path.
-**Requirement**: PCE-11 through PCE-16, PCE-27; REQ-007, REQ-008, REQ-010, REQ-028, REQ-029.
+**Requirement**: PCE-11 through PCE-16, PCE-27, PCE-51, PCE-52; REQ-007, REQ-008, REQ-010, REQ-028, REQ-029.
 
 **Tools**:
 
@@ -856,7 +856,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 **Where**: `src/task-analyzer-server/task_analyzer_server/api.py` (modify)
 **Depends on**: T22, T19, T11
 **Reuses**: T19's creation command and T11's request contracts.
-**Requirement**: PCE-01 through PCE-10, PCE-19, PCE-20, PCE-26, PCE-37 through PCE-40, PCE-48; REQ-007, REQ-010, REQ-029, REQ-031.
+**Requirement**: PCE-01 through PCE-10, PCE-19, PCE-20, PCE-26, PCE-37 through PCE-40, PCE-48, PCE-51, PCE-52; REQ-007, REQ-010, REQ-029, REQ-031.
 
 **Tools**:
 
@@ -886,7 +886,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 **Where**: `src/task-analyzer-server/task_analyzer_server/api.py` (modify)
 **Depends on**: T25
 **Reuses**: T25's envelope handling and result mapping.
-**Requirement**: PCE-11 through PCE-16, PCE-23, PCE-27, PCE-41, PCE-42; REQ-007, REQ-008, REQ-010, REQ-029, REQ-031.
+**Requirement**: PCE-11 through PCE-16, PCE-23, PCE-27, PCE-41, PCE-42, PCE-51, PCE-52; REQ-007, REQ-008, REQ-010, REQ-029, REQ-031.
 
 **Tools**:
 
@@ -1230,10 +1230,10 @@ No task depends on a task in a later phase.
 
 | Criterion group | Tasks that carry it |
 | --- | --- |
-| PCE-01 through PCE-10, PCE-48 (creation and field bounds) | T7, T11, T19, T25 |
+| PCE-01 through PCE-10, PCE-48, PCE-51, PCE-52 (creation and field bounds) | T7, T11, T19, T25 |
 | PCE-11 through PCE-16 (pending edits) | T7, T15, T20, T26 |
 | PCE-17 through PCE-27 (uniqueness) | T5, T8, T15, T21, T25, T26, T29 |
-| PCE-28 through PCE-33, PCE-49, PCE-50 (time, zone, cutoff) | T9, T10, T14, T18, T23 |
+| PCE-28 through PCE-33, PCE-49, PCE-50, PCE-51, PCE-52 (time, zone, cutoff) | T9, T10, T14, T18, T23 |
 | PCE-34, PCE-35, PCE-36 (durability and fresh sessions) | T6, T22, T24, T28 |
 | PCE-37 through PCE-43 (operation outcomes and recovery) | T13, T16, T17, T25, T26, T27, T29 |
 | PCE-44 through PCE-47 (runtime and private access) | T1, T2, T3, T22, T30, T31 |
