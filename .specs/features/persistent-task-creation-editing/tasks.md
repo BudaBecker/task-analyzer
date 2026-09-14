@@ -977,7 +977,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T29: Verify concurrency and fault-injection behaviour
+### T29: Verify concurrency and fault-injection behaviour [Complete]
 
 **What**: Add the concurrency and failure suite for overlapping attempts, conflicting operations, and crash points around commit.
 **Where**: `tests/server/integration/test_concurrency.py`
@@ -992,13 +992,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] Two simultaneous copies of one attempt, run on independent connections with explicit synchronization rather than sleeps, apply the operation exactly once; the second observes the first terminal result.
-- [ ] Two distinct operations that conflict under uniqueness never both produce an accepted resulting task, and neither is treated as a replay of the other.
-- [ ] A stop before commit leaves no committed partial task and result pair, and the same attempt repeated afterwards can still establish a result.
-- [ ] A stop after commit but before the response leaves the original outcome discoverable and is never applied twice.
-- [ ] A lock timeout or storage failure surfaces as an infrastructure error with no invented terminal result, and lookup during in-flight work returns unknown rather than rejection.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 12 tests pass in `tests/server/integration/test_concurrency.py` (no silent deletions).
+- [x] Two simultaneous copies of one attempt, run on independent connections with explicit synchronization rather than sleeps, apply the operation exactly once; the second observes the first terminal result.
+- [x] Two distinct operations that conflict under uniqueness never both produce an accepted resulting task, and neither is treated as a replay of the other.
+- [x] A stop before commit leaves no committed partial task and result pair, and the same attempt repeated afterwards can still establish a result.
+- [x] A stop after commit but before the response leaves the original outcome discoverable and is never applied twice.
+- [x] A lock timeout or storage failure surfaces as an infrastructure error with no invented terminal result, and lookup during in-flight work returns unknown rather than rejection.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 12 tests pass in `tests/server/integration/test_concurrency.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full
