@@ -43,13 +43,17 @@ from task_analyzer_server import services
 from task_analyzer_server.clock import Clock
 from task_analyzer_server.contracts import (
     ErrorCode,
+    OperationRequest,
+    OperationResult,
     ProtocolError,
     ProtocolErrorDetail,
 )
+from task_analyzer_server.logging_config import DurationTimer
 from task_analyzer_server.settings import ServerSettings
 
 API_PREFIX = "/v1"
 
+OPERATION_ID_HEADER = "Operation-Id"
 PRODUCT_TIME_ZONE_FIELD = "product_time_zone"
 
 CACHE_CONTROL_HEADER = "Cache-Control"
@@ -60,6 +64,7 @@ REQUEST_ID_KEY = "task_analyzer_request_id"
 OPERATION_ID_KEY = "task_analyzer_operation_id"
 
 PROTOCOL_ERROR_EVENT = "protocol_error"
+OPERATION_RESOLVED_EVENT = "operation_resolved"
 
 OK_STATUS = 200
 BAD_REQUEST_STATUS = 400
@@ -147,6 +152,38 @@ async def configure_product_time_zone(request: Request) -> Response:
             _settings_of(request), _clock_of(request), zone_key
         ),
         OK_STATUS,
+    )
+
+
+@router.post("/tasks")
+async def create_task(request: Request) -> Response:
+    """Create one pending task from a submitted operation.
+
+    The envelope is read first, so a request the server cannot identify
+    never reaches the operation flow. Once the envelope is usable, the
+    task fields are validated inside that flow, which is what keeps a
+    rejected submission consultable afterwards.
+
+    Args:
+        request: The submitted HTTP request.
+
+    Returns:
+        The terminal result of the attempt, answered with the status
+        that attempt was originally settled with.
+
+    Raises:
+        ProtocolRefusalError: If the envelope is unusable, the identity
+            was already resolved for different content, or no product
+            time zone has been fixed.
+    """
+    timer = DurationTimer()
+    submitted = await _submitted_operation(request)
+    return _resolved(
+        request,
+        services.create_task(
+            _settings_of(request), _clock_of(request), submitted
+        ),
+        timer,
     )
 
 
@@ -249,6 +286,81 @@ def usable_operation_id(request: Request, submitted: str) -> UUID:
         ) from None
     _request_state(request)[OPERATION_ID_KEY] = identity
     return identity
+
+
+async def _submitted_operation(request: Request) -> OperationRequest:
+    """Read the operation envelope one task command submitted.
+
+    The identity, the method and the target come from the request
+    itself, and the payload is the JSON it carried, parsed but not yet
+    judged. Whether those task fields are acceptable is the operation
+    flow's decision, not this one's, so an invalid submission still
+    reaches the flow and still gets a retained answer.
+
+    Args:
+        request: The submitted HTTP request.
+
+    Returns:
+        The submitted operation and its envelope values.
+
+    Raises:
+        ProtocolRefusalError: ``INVALID_OPERATION_ENVELOPE`` if no
+            usable operation identity was supplied or the body is not
+            JSON at all.
+    """
+    identity = usable_operation_id(
+        request, request.headers.get(OPERATION_ID_HEADER, "")
+    )
+    body = await request.body()
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        raise services.ProtocolRefusalError(
+            ErrorCode.INVALID_OPERATION_ENVELOPE
+        ) from None
+    return OperationRequest(
+        operation_id=identity,
+        method=request.method,
+        target=request.url.path,
+        payload=payload,
+    )
+
+
+def _resolved(
+    request: Request, result: OperationResult, timer: DurationTimer
+) -> Response:
+    """Publish and record the terminal result of one attempt.
+
+    The result is already committed when this runs, so the recorded
+    success event never describes work that was not persisted. The
+    status is the one the attempt was originally settled with, which is
+    what makes a repetition answer exactly like the original request.
+
+    Args:
+        request: The submitted HTTP request.
+        result: The terminal result of the attempt.
+        timer: The monotonic measurement started when the request
+            arrived.
+
+    Returns:
+        The published result.
+    """
+    _logger.info(
+        OPERATION_RESOLVED_EVENT,
+        extra={
+            "request_id": str(_request_id(request)),
+            "operation_id": str(result.operation_id),
+            "task_id": None
+            if result.task is None
+            else str(result.task.task_id),
+            "outcome": result.outcome,
+            "error_code": (
+                None if result.error is None else result.error.code.value
+            ),
+            "duration_ms": timer.elapsed_ms(),
+        },
+    )
+    return published(result, result.original_http_status)
 
 
 def _submitted_zone_key(body: bytes) -> str:

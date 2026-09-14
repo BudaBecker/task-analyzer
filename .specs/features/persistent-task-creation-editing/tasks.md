@@ -872,13 +872,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] A valid request with an `Operation-Id` header returns `201` with the durable operation result and the created task snapshot.
-- [ ] Validation rejections return `422 TASK_VALIDATION_FAILED` and uniqueness rejections `409 TASK_UNIQUENESS_CONFLICT`, both stored as terminal results.
-- [ ] A task command before zone setup returns `409 PRODUCT_TIME_ZONE_REQUIRED` without recording a terminal task result.
-- [ ] A repeated identical attempt returns the original stored result with its original HTTP status and creates no second task.
-- [ ] E2E tests cover boundary fixtures, lost-response replay, before-setup, malformed JSON, unusable ID, changed-content ID reuse, wrong field types, unknown fields and storage failure. Exact responses and lookup must distinguish retained rejections from protocol-only failures using T22 handlers.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 18 tests pass in `tests/server/integration/test_api_tasks_create.py` (no silent deletions).
+- [x] A valid request with an `Operation-Id` header returns `201` with the durable operation result and the created task snapshot.
+- [x] Validation rejections return `422 TASK_VALIDATION_FAILED` and uniqueness rejections `409 TASK_UNIQUENESS_CONFLICT`, both stored as terminal results.
+- [x] A task command before zone setup returns `409 PRODUCT_TIME_ZONE_REQUIRED` without recording a terminal task result.
+- [x] A repeated identical attempt returns the original stored result with its original HTTP status and creates no second task.
+- [x] E2E tests cover boundary fixtures, lost-response replay, before-setup, malformed JSON, unusable ID, changed-content ID reuse, wrong field types, unknown fields and storage failure. Exact responses and lookup must distinguish retained rejections from protocol-only failures using T22 handlers.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 18 tests pass in `tests/server/integration/test_api_tasks_create.py` (no silent deletions).
 
 **Tests**: e2e
 **Gate**: full
