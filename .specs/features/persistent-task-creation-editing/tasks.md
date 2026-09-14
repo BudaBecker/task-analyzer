@@ -312,7 +312,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T11: Implement strict request contracts
+### T11: Implement strict request contracts [Complete]
 
 **What**: Add the task input and operation envelope request models with strict parsing and stable field-error codes.
 **Where**: `src/task-analyzer-server/task_analyzer_server/contracts.py`
@@ -327,13 +327,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] `TaskInput` accepts `title` string, `observations` string or null, and `deadline` calendar-date string or null; `null` clears an optional value and an omitted optional value means absent.
-- [ ] Type coercion is rejected as `INVALID_FIELD_TYPE`, unknown fields as `UNEXPECTED_FIELD`, and server-owned fields such as status or creation time are rejected rather than silently applied.
-- [ ] `ValidationIssue` is an immutable field/code value type. Strict structural parsing is separate from T7 business validation; neither bypasses the durable rejection flow for valid operation envelopes.
-- [ ] `OperationRequest` binds the operation UUID, method, canonical task target, and parsed JSON payload.
-- [ ] Framework validation errors are translated into the stable codes; framework error objects and echoed input never reach the contract surface.
-- [ ] Gate check passes: `python -m pytest tests/server/unit`.
-- [ ] Test count: at least 16 tests pass in `tests/server/unit/test_contracts_input.py` (no silent deletions).
+- [x] `TaskInput` accepts `title` string, `observations` string or null, and `deadline` calendar-date string or null; `null` clears an optional value and an omitted optional value means absent.
+- [x] Type coercion is rejected as `INVALID_FIELD_TYPE`, unknown fields as `UNEXPECTED_FIELD`, and server-owned fields such as status or creation time are rejected rather than silently applied.
+- [x] `ValidationIssue` is an immutable field/code value type. Strict structural parsing is separate from T7 business validation; neither bypasses the durable rejection flow for valid operation envelopes.
+- [x] `OperationRequest` binds the operation UUID, method, canonical task target, and parsed JSON payload.
+- [x] Framework validation errors are translated into the stable codes; framework error objects and echoed input never reach the contract surface.
+- [x] Gate check passes: `python -m pytest tests/server/unit`.
+- [x] Test count: at least 16 tests pass in `tests/server/unit/test_contracts_input.py` (no silent deletions).
 
 **Tests**: unit
 **Gate**: quick
