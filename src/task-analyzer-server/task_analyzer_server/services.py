@@ -281,6 +281,31 @@ def edit_task(
     return apply_operation(settings, request, command)
 
 
+def read_configuration(
+    settings: ServerSettings, clock: Clock
+) -> ConfigurationView:
+    """Read the product configuration as it currently stands.
+
+    The connection is opened for this reading alone and takes no write
+    transaction, so the answer is a fresh committed snapshot and never
+    competes with work in flight.
+
+    Args:
+        settings: Runtime configuration naming the database.
+        clock: The server's source of the current instant.
+
+    Returns:
+        The configuration at one sampled server instant. An
+        unconfigured server reports the absence of a zone rather than
+        inventing one.
+    """
+    with storage.open_connection(
+        settings.database_path, settings.db_busy_timeout_ms
+    ) as connection:
+        zone_key = storage.read_product_time_zone(connection)
+    return configuration_view(clock, zone_key)
+
+
 def configure_zone(
     settings: ServerSettings, clock: Clock, zone_key: str
 ) -> ConfigurationView:

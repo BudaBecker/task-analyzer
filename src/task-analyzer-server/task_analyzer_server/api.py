@@ -30,6 +30,7 @@ account, so nothing here turns the personal collection into an account.
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 from typing import Any, cast
@@ -39,6 +40,7 @@ from fastapi import APIRouter, FastAPI, Request, Response
 from pydantic import BaseModel
 
 from task_analyzer_server import services
+from task_analyzer_server.clock import Clock
 from task_analyzer_server.contracts import (
     ErrorCode,
     ProtocolError,
@@ -47,6 +49,8 @@ from task_analyzer_server.contracts import (
 from task_analyzer_server.settings import ServerSettings
 
 API_PREFIX = "/v1"
+
+PRODUCT_TIME_ZONE_FIELD = "product_time_zone"
 
 CACHE_CONTROL_HEADER = "Cache-Control"
 NO_STORE = "no-store"
@@ -100,6 +104,50 @@ def install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(services.ProtocolRefusalError, _handle_refusal)
     app.add_exception_handler(sqlite3.Error, _handle_storage_failure)
     app.add_exception_handler(Exception, _handle_unexpected)
+
+
+@router.get("/configuration")
+def read_configuration(request: Request) -> Response:
+    """Publish the product configuration as it currently stands.
+
+    Args:
+        request: The submitted HTTP request.
+
+    Returns:
+        The configuration at one sampled server instant.
+    """
+    return published(
+        services.read_configuration(_settings_of(request), _clock_of(request)),
+        OK_STATUS,
+    )
+
+
+@router.put("/configuration")
+async def configure_product_time_zone(request: Request) -> Response:
+    """Fix the product time zone, or confirm the one already fixed.
+
+    Setup is a compare-and-set on a singleton rather than a task
+    operation, so it carries no operation identity and the same key is
+    safe to send again. A different key never replaces a retained zone.
+
+    Args:
+        request: The submitted HTTP request.
+
+    Returns:
+        The configuration as it stands once the attempt finished.
+
+    Raises:
+        ProtocolRefusalError: ``INVALID_TIME_ZONE`` if no usable zone
+            key was submitted, or ``PRODUCT_TIME_ZONE_FIXED`` if
+            another key is already retained.
+    """
+    zone_key = _submitted_zone_key(await request.body())
+    return published(
+        services.configure_zone(
+            _settings_of(request), _clock_of(request), zone_key
+        ),
+        OK_STATUS,
+    )
 
 
 @router.get("/operations/{operation_id}")
@@ -181,6 +229,40 @@ def usable_operation_id(request: Request, submitted: str) -> UUID:
         ) from None
     _request_state(request)[OPERATION_ID_KEY] = identity
     return identity
+
+
+def _submitted_zone_key(body: bytes) -> str:
+    """Read the zone key a setup request submitted.
+
+    Setup takes exactly one field, so a body that cannot be read, is not
+    an object, carries another field, or holds anything but text leaves
+    the server with no usable zone key. That is the same answer an
+    unknown key gets: the submitted zone is not one the server can fix.
+
+    Args:
+        body: The submitted request body.
+
+    Returns:
+        The submitted zone key, unvalidated.
+
+    Raises:
+        ProtocolRefusalError: ``INVALID_TIME_ZONE`` if no usable zone
+            key was submitted.
+    """
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        raise services.ProtocolRefusalError(
+            ErrorCode.INVALID_TIME_ZONE
+        ) from None
+    if not isinstance(payload, dict) or set(payload) != {
+        PRODUCT_TIME_ZONE_FIELD
+    }:
+        raise services.ProtocolRefusalError(ErrorCode.INVALID_TIME_ZONE)
+    submitted = payload[PRODUCT_TIME_ZONE_FIELD]
+    if not isinstance(submitted, str):
+        raise services.ProtocolRefusalError(ErrorCode.INVALID_TIME_ZONE)
+    return submitted
 
 
 def _handle_refusal(request: Request, exception: Exception) -> Response:
@@ -317,3 +399,15 @@ def _settings_of(request: Request) -> ServerSettings:
         The settings of this application.
     """
     return cast(ServerSettings, request.app.state.settings)
+
+
+def _clock_of(request: Request) -> Clock:
+    """Reach the clock the application was composed with.
+
+    Args:
+        request: The HTTP request being served.
+
+    Returns:
+        The server's source of the current instant.
+    """
+    return cast(Clock, request.app.state.clock)

@@ -814,12 +814,12 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] `GET` returns 200 with the configured flag, retained zone or null, server UTC time, and product date or null.
-- [ ] `PUT` persists the first valid zone, returns the same configuration for a repeated identical key, returns `409 PRODUCT_TIME_ZONE_FIXED` for a different key without replacing the retained zone, and `422 INVALID_TIME_ZONE` for an unknown key.
-- [ ] Responses carry `Cache-Control: no-store` and contain no business logic beyond envelope mapping.
-- [ ] E2E tests cover the happy path, repeated setup, conflicting setup, and invalid zone.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 10 tests pass in `tests/server/integration/test_api_configuration.py` (no silent deletions).
+- [x] `GET` returns 200 with the configured flag, retained zone or null, server UTC time, and product date or null.
+- [x] `PUT` persists the first valid zone, returns the same configuration for a repeated identical key, returns `409 PRODUCT_TIME_ZONE_FIXED` for a different key without replacing the retained zone, and `422 INVALID_TIME_ZONE` for an unknown key.
+- [x] Responses carry `Cache-Control: no-store` and contain no business logic beyond envelope mapping.
+- [x] E2E tests cover the happy path, repeated setup, conflicting setup, and invalid zone.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 10 tests pass in `tests/server/integration/test_api_configuration.py` (no silent deletions).
 
 **Tests**: e2e
 **Gate**: full
