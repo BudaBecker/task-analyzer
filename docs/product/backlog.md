@@ -52,3 +52,5 @@ All questions below concern future work outside the MVP.
 
 - Which authentication, local persistence, backup, synchronization, and notification-delivery options should be evaluated if their associated product capabilities are approved?
 - Technical decisions for the MVP are maintained separately in [AGENTS.md](../../AGENTS.md#open-questions). No technical choice for a deferred capability is an MVP prerequisite.
+
+- A possible PostgreSQL migration is a future learning idea, not an MVP requirement. Evaluate it only in a separately approved scope; do not build a second persistence implementation in anticipation.

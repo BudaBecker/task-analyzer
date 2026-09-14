@@ -1,194 +1,54 @@
-# Task Analyzer Server deployment and private access
+# Server deployment
 
-This guide describes how the Task Analyzer Server is installed on the
-dedicated Ubuntu host, how its database is initialized once, and how the
-desktop reaches it privately through Tailscale. It follows the approved
-[1A Design](../../../.specs/features/persistent-task-creation-editing/design.md)
-and the runtime constraints in [AGENTS.md](../../../AGENTS.md).
+Target: the user's dedicated Ubuntu Server 26.04.1 LTS host, one Uvicorn worker on loopback and Tailscale Serve for private HTTPS. [Server design](../../../.specs/features/persistent-task-creation-editing/design.md) defines the contracts; [README](../../../README.md) owns local development commands.
 
-## Authorization
+## Authorization and prerequisites
 
-**Nothing in this document has been executed.** No host was contacted, no
-interpreter inspected, no account created, no database initialized, and no
-tailnet rule configured. The guide is a written procedure, not a record of
-work performed.
+This procedure has not been run on the target. Deployment, account/service configuration and real database initialization require explicit authorization. Initialization is a separate step; preserve any existing state first.
 
-The target is the user's own Ubuntu server, not a disposable validation
-host. That has three consequences:
-
-- Every install, service, and Tailscale step below requires explicit
-  authorization **at the time it is run**. Approval of the feature, this
-  document, or the task plan does not authorize any of them.
-- The first `initialize_database` call is authorized **separately** from
-  the deployment itself.
-- Existing state is backed up **before** that first initialization.
-
-Writing or reviewing this guide satisfies no acceptance criterion that
-requires evidence from the host.
-
-## Values to confirm before deployment
-
-These are unknown in the environment that produced this repository. Each
-must be supplied and confirmed in an authorized session before the step
-that needs it runs.
-
-| Value | Used by | Status |
-| --- | --- | --- |
-| Installed interpreter and version set on the target | Dependency locks, service `ExecStart` | Not confirmed |
-| Installation path (assumed `/opt/task-analyzer`) | Service unit, install steps | Not confirmed |
-| State directory and database path (assumed `/var/lib/task-analyzer/task-analyzer.sqlite3`) | Service environment, initialization | Not confirmed |
-| Tailnet device name for this server | Tailscale Serve, desktop configuration | Not confirmed |
-| Authorized desktop device identifiers | Tailnet access policy | Not confirmed |
-
-## Target interpreter checkpoint
-
-[`requirements/README.md`](../../../requirements/README.md) records that the
-hash-pinned locks were generated on Windows 11 / AMD64 / CPython 3.13.2.
-They claim no cross-platform validation.
-
-Before the service is considered deployable:
-
-1. Confirm the interpreter actually installed on Ubuntu Server 26.04.1 LTS
-   satisfies the approved `>=3.13` baseline.
-2. Re-check the locked dependency set against that interpreter, producing a
-   target-specific lock from the same `.in` inputs.
-3. Run the same quality gates on that environment.
-
-A local lock is not evidence of target compatibility. If a dependency
-cannot satisfy the Python 3.13 baseline on the target, that returns to
-Design as a revision proposal; the baseline is not lowered or raised to
-accommodate a package.
+Confirm the actual Python interpreter (3.13+), installation/state paths, tailnet hostname and authorized desktop device. uv.lock resolves dependencies across supported environments, but does not prove installation or execution on this host. Run the quality checks on the actual target interpreter before claiming compatibility.
 
 ## Installation
 
-Run as an administrator on the target host, after authorization.
+Proposed paths: `/opt/task-analyzer` for the read-only installed application and `/var/lib/task-analyzer/task-analyzer.sqlite3` for local state. Adjust the service asset to confirmed values. Use a dedicated unprivileged `task-analyzer` account.
 
-Create the dedicated unprivileged account and the installation directory:
+Build the wheel with `uv build`. For deployment, export the locked runtime dependencies and install into the service environment:
 
-```
-sudo adduser --system --group --no-create-home --home /opt/task-analyzer task-analyzer
-sudo install -d -o root -g root -m 0755 /opt/task-analyzer
-```
-
-Install the application and its locked dependencies into a virtual
-environment that the service account can read but not write:
-
-```
-sudo python3.13 -m venv /opt/task-analyzer/venv
-sudo /opt/task-analyzer/venv/bin/python -m pip install --require-hashes -r requirements/server-py313.txt
-sudo /opt/task-analyzer/venv/bin/python -m pip install --no-deps dist/task_analyzer_server-<version>-py3-none-any.whl
-sudo /opt/task-analyzer/venv/bin/python -m pip check
+```sh
+uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file /tmp/task-analyzer-runtime.txt
+sudo uv venv --python /path/to/confirmed/python /opt/task-analyzer/venv
+sudo uv pip install --python /opt/task-analyzer/venv/bin/python --require-hashes -r /tmp/task-analyzer-runtime.txt
+sudo uv pip install --python /opt/task-analyzer/venv/bin/python --no-deps dist/task_analyzer_server-0.1.0-py3-none-any.whl
+uv pip check --python /opt/task-analyzer/venv/bin/python
 ```
 
-Use the target-specific lock produced by the checkpoint above, not the
-Windows lock committed here. The wheel is built with
-`python -m build --no-isolation` using the locked build backend.
+`/tmp/task-analyzer-runtime.txt` is generated for this installation, not a second dependency source. Confirm uv availability and grant only the service account's needed read access to installed files.
 
-## One-time database initialization
+## One-time initialization and service
 
-**This step is authorized separately from the deployment.** Back up any
-existing state first.
+After separate database authorization, create the state directory owned by `task-analyzer` (mode 0750), then initialize a new path:
 
-The application never creates, migrates, or repairs a database. It opens
-the configured file in existing-file mode and fails visibly if the file is
-absent or incompatible. Initialization is therefore explicit and happens
-exactly once:
-
-```
-sudo -u task-analyzer /opt/task-analyzer/venv/bin/python -c \
-  "from pathlib import Path; from task_analyzer_server.schema import initialize_database; initialize_database(Path('/var/lib/task-analyzer/task-analyzer.sqlite3'))"
+```sh
+sudo -u task-analyzer /opt/task-analyzer/venv/bin/python -c "from pathlib import Path; from task_analyzer_server.schema import initialize_database; initialize_database(Path('/var/lib/task-analyzer/task-analyzer.sqlite3'))"
 ```
 
-The state directory is created and owned by systemd through
-`StateDirectory=task-analyzer` when the service first starts; create it
-beforehand if initialization runs first.
+The initializer refuses existing paths. Normal startup only opens an existing database and never initializes or migrates one. An unset product zone is configured through the API once the server is running.
 
-A newly initialized database legitimately has no product time zone yet.
-The configuration endpoints remain usable, and the desktop completes that
-one-time setup before task operations are enabled.
+Install [task-analyzer-server.service](task-analyzer-server.service) under `/etc/systemd/system/`, then run `systemctl daemon-reload` and `systemctl enable --now task-analyzer-server`. The unit runs one worker, uses a writable state directory and protects the installed application. Inspect JSON-line logs with `journalctl -u task-analyzer-server -f`.
 
-## Service installation
+## Private access and acceptance
 
-Install [`task-analyzer-server.service`](task-analyzer-server.service) to
-`/etc/systemd/system/`, then:
+Configure Tailscale Serve after authorization:
 
-```
-sudo systemctl daemon-reload
-sudo systemctl enable --now task-analyzer-server.service
-systemctl status task-analyzer-server.service
-```
-
-The unit runs one Uvicorn worker bound to `127.0.0.1:8000`, with no
-development reload, under the `task-analyzer` account, with the installed
-application read-only and only the state directory writable. Adjust the
-paths in the unit to the confirmed values before installing it.
-
-Logs are JSON lines on the journal:
-
-```
-journalctl -u task-analyzer-server.service -f
-```
-
-Task titles, observations, request bodies, and canonical requests are
-never logged.
-
-## Private access through Tailscale
-
-The listener stays on loopback. Tailscale Serve is the tailnet-only HTTPS
-front end; the port is never published to the local network or the
-internet.
-
-```
+```sh
 sudo tailscale serve --bg --https 443 http://127.0.0.1:8000
 tailscale serve status
 ```
 
-Serve's persistent background mode resumes after reboot. Restrict access
-to the authorized desktop device through the tailnet access policy, using
-the dedicated device name for this server.
+Restrict the tailnet policy to the authorized desktop. No product sign-in or forwarded-header account is added. The API port stays on loopback; do not publish it directly.
 
-The application has no product sign-in and no product accounts. It does
-not treat forwarded identity headers as product identity. Privacy comes
-from the tailnet boundary, which is why the private-access check is part
-of acceptance rather than an optional hardening step.
-
-## Verification checklist
-
-Run on the target, in an authorized session. Record the actual output.
-
-| Check | Evidence |
-| --- | --- |
-| Interpreter satisfies `>=3.13` | `python --version` on the target |
-| Locked dependencies install and agree | `pip install --require-hashes`, then `pip check` |
-| Quality gates pass on the target | `ruff format --check`, `ruff check`, `mypy --strict`, `pytest tests/server` |
-| Database initialized exactly once | Initialization output; service starts against the existing file |
-| Service starts, restarts, and survives reboot | `systemctl status`, a forced restart, and a reboot |
-| Configured product zone survives a restart | `GET /v1/configuration` before and after |
-| Persisted tasks survive a restart | `GET /v1/tasks` before and after |
-| Private access from the authorized desktop | HTTPS request over the tailnet, with no product sign-in |
-| Service is unreachable outside the tailnet | Connection attempt from an unauthorized network |
-
-## Completion status
-
-PCE-44 and PCE-45 (runtime and self-hosting) and PCE-46 and PCE-47
-(personal collection without product accounts, private Tailscale access)
-cannot be closed by local work alone. The absence of product sign-in is
-verified locally through the composed application; the private tailnet
-path is not.
-
-Local implementation tasks may finish while this checkpoint is open. The
-feature does not receive an overall PASS or `Verified` traceability status
-until the target-interpreter gates and the required private-access
-evidence pass in a later, explicitly authorized verification session.
+Record actual evidence for: interpreter/locked dependency compatibility; installed startup, restart and reboot; retained zone/tasks after restart; access from the authorized desktop; and rejection of unauthorized access. Local tests and these instructions alone do not satisfy PCE-47 or the target-interpreter checkpoint. Physical power-loss durability is not established by process-restart tests.
 
 ## Open questions
 
-- Which interpreter and version set does the Ubuntu Server 26.04.1 LTS
-  target actually provide, and does the locked dependency set resolve
-  against it? Handed over from the dependency task and still open.
-- Which tailnet device name and authorized desktop device identifiers
-  will this service use?
-- Which installation and state paths will the host use, if not the
-  assumed `/opt/task-analyzer` and `/var/lib/task-analyzer`?
-- When will the authorized deployment session run, and who confirms the
-  backup of existing state before the first database initialization?
+Actual interpreter, paths, hostname/device policy and timing of the authorized host session remain unknown. No deployment or real database change was performed during simplification.

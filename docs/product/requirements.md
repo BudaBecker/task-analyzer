@@ -2,7 +2,7 @@
 
 This document defines product behavior and acceptance scenarios for the [MVP scope](scope.md). Requirement IDs identify the inputs for future specifications and tests. The scenarios below are documentation, not executed tests.
 
-The Task Analyzer Server owns business rules, persistence, and calculations. The Desktop App collects input and presents server results. [User flows](user-flows.md) describes interaction sequences, and [Domain vocabulary](domain.md) defines shared terms.
+The Task Analyzer Server owns business rules, persistence, and calculations. The Desktop App collects input and presents server results. This document includes the detailed interaction sequences; [MVP scope](scope.md#learning-goals-and-vocabulary) defines the shared vocabulary.
 
 ## Platform and access
 
