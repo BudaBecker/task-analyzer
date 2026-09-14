@@ -342,7 +342,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T7: Implement task field validation
+### T7: Implement task field validation [Complete]
 
 **What**: Add `validate_task` enforcing the approved title, observations, and deadline rules with user-perceived character counting.
 **Where**: `src/task-analyzer-server/task_analyzer_server/domain.py`
@@ -357,13 +357,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] The title is counted in extended grapheme clusters after trimming leading and trailing spaces; an empty or whitespace-only title is rejected as `TITLE_REQUIRED` independently of the limit.
-- [ ] A 200-cluster title is accepted and 201 rejected as `TITLE_TOO_LONG`; 5,000-cluster observations are accepted and 5,001 rejected as `OBSERVATIONS_TOO_LONG`; observations are counted as supplied with line breaks preserved.
-- [ ] Absent observations and an absent deadline are accepted; a valid past calendar date in the supported range is accepted; a non-calendar or out-of-range date is rejected as `INVALID_DEADLINE`. Tests accept both `0001-01-01` and `9999-12-30` and reject `9999-12-31`; range checks occur before cutoff arithmetic.
-- [ ] Accepted input is never truncated, and counting stops once a limit is exceeded.
-- [ ] Unit tests cover each criterion with both the original simple-text fixtures and combined-character fixtures: a base letter with combining marks and a joined emoji sequence each count as one character.
-- [ ] Gate check passes: `python -m pytest tests/server/unit`.
-- [ ] Test count: at least 24 tests pass in `tests/server/unit/test_domain_validation.py` (no silent deletions).
+- [x] The title is counted in extended grapheme clusters after trimming leading and trailing spaces; an empty or whitespace-only title is rejected as `TITLE_REQUIRED` independently of the limit.
+- [x] A 200-cluster title is accepted and 201 rejected as `TITLE_TOO_LONG`; 5,000-cluster observations are accepted and 5,001 rejected as `OBSERVATIONS_TOO_LONG`; observations are counted as supplied with line breaks preserved.
+- [x] Absent observations and an absent deadline are accepted; a valid past calendar date in the supported range is accepted; a non-calendar or out-of-range date is rejected as `INVALID_DEADLINE`. Tests accept both `0001-01-01` and `9999-12-30` and reject `9999-12-31`; range checks occur before cutoff arithmetic.
+- [x] Accepted input is never truncated, and counting stops once a limit is exceeded.
+- [x] Unit tests cover each criterion with both the original simple-text fixtures and combined-character fixtures: a base letter with combining marks and a joined emoji sequence each count as one character.
+- [x] Gate check passes: `python -m pytest tests/server/unit`.
+- [x] Test count: at least 24 tests pass in `tests/server/unit/test_domain_validation.py` (no silent deletions).
 
 **Tests**: unit
 **Gate**: quick
