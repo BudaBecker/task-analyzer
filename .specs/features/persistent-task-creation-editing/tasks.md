@@ -962,13 +962,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] A creation and an edit confirmed as persisted are still present, unchanged, after the application process is stopped and a new process starts against the same disposable database file.
-- [ ] The configured product zone survives the same restart, and deadline interpretation still uses it.
-- [ ] A fresh client session reads the persisted state without any client-side retention.
-- [ ] The suite uses a newly allocated temporary database and can never fall back to a configured runtime database path.
-- [ ] The report states plainly that a process restart is not evidence of physical power-loss durability.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 8 tests pass in `tests/server/integration/test_durability.py` (no silent deletions).
+- [x] A creation and an edit confirmed as persisted are still present, unchanged, after the application process is stopped and a new process starts against the same disposable database file.
+- [x] The configured product zone survives the same restart, and deadline interpretation still uses it.
+- [x] A fresh client session reads the persisted state without any client-side retention.
+- [x] The suite uses a newly allocated temporary database and can never fall back to a configured runtime database path.
+- [x] The report states plainly that a process restart is not evidence of physical power-loss durability.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 8 tests pass in `tests/server/integration/test_durability.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full
