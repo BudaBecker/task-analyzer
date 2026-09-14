@@ -13,8 +13,8 @@ The original implementation and audit are preserved in Git at `8c68d6a`. Histori
 - [x] Simplify project instructions and document the approved process/tooling change.
 - [x] Establish uv, a persistent ignored .venv and repeatable setup/build commands.
 - [x] Fix initialization ownership, blocking routes, JSON number handling, read consistency and runtime logging, with regressions.
-- [ ] Consolidate explanatory text and shared test setup while preserving scenarios.
-- [ ] Refresh feature/product documentation, run full checks and report measured results.
+- [x] Consolidate explanatory text and shared test setup while preserving scenarios.
+- [x] Refresh feature/product documentation, run full checks and report measured results.
 
 ## Verification
 
@@ -22,9 +22,11 @@ Run the full suite, Ruff formatting/lint, strict mypy, dependency checks, packag
 
 ## Results
 
-uv migration: the persistent .venv is installed and all 588 original cases pass, including installed-wheel startup/restart. Runtime and retained development dependency versions match the original locks.
+The repository now uses `pyproject.toml`, `uv.lock`, `.python-version` and an ignored persistent `.venv`; the former pip-tools requirements set was removed. The five audit defects were fixed with 14 focused regressions: initialization ownership, event-loop blocking, non-finite/overflow JSON numbers, consistent list snapshots and Uvicorn JSON logs.
 
-Work in progress. Baseline: 11 Python source files / 3,760 lines; 29 test files / 11,973 lines; 588 executed test cases. Final measurements and checks will replace this paragraph.
+Active documentation fell from 17 files / 3,181 lines to 10 files / 745 lines. Python source stayed at 11 files and fell from 3,760 to 2,082 lines by removing restated contracts from docstrings; an AST comparison confirmed that this cleanup changed no executable statements. Tests fell from 29 files / 11,973 lines / 588 cases to 27 files / 8,062 lines / 508 cases. The final suite includes the 14 new audit regressions; 94 redundant lower-layer cases were retired, for a net reduction of 80 cases from the baseline. Shared clocks, settings and disposable paths now live in two small helpers.
+
+Final local verification passed: locked sync, Ruff format/lint, strict mypy, dependency compatibility, 508 tests, source distribution and wheel build. The suite includes the installed-wheel startup/restart smoke test. Two third-party deprecation warnings remain in Starlette's current test client integration.
 
 ## Open questions
 
