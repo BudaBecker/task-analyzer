@@ -283,7 +283,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T6: Implement the explicit database initializer
+### T6: Implement the explicit database initializer [Complete]
 
 **What**: Add `initialize_database(path)` as the only entry point that creates a new database from the versioned DDL.
 **Where**: `src/task-analyzer-server/task_analyzer_server/schema.py`
@@ -298,12 +298,12 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] Initialization creates the schema and records the schema version in one transaction against an absent file.
-- [ ] An existing database is never silently recreated, migrated, or overwritten; the function raises a specific error identifying the path.
-- [ ] The initializer is importable but never invoked at application startup. Load `schema/001_initial.sql` through standard `importlib.resources`, independent of the checkout/current directory. Its initialization transaction uses standard sqlite3 directly; T13 operational helpers are not dependencies.
-- [ ] Integration tests run only against newly allocated temporary paths; no test targets a configured runtime database.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 6 tests pass in `tests/server/integration/test_schema_init.py` (no silent deletions).
+- [x] Initialization creates the schema and records the schema version in one transaction against an absent file.
+- [x] An existing database is never silently recreated, migrated, or overwritten; the function raises a specific error identifying the path.
+- [x] The initializer is importable but never invoked at application startup. Load `schema/001_initial.sql` through standard `importlib.resources`, independent of the checkout/current directory. Its initialization transaction uses standard sqlite3 directly; T13 operational helpers are not dependencies.
+- [x] Integration tests run only against newly allocated temporary paths; no test targets a configured runtime database.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 6 tests pass in `tests/server/integration/test_schema_init.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full
