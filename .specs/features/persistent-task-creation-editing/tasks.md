@@ -460,7 +460,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T12: Implement response and result contracts
+### T12: Implement response and result contracts [Complete]
 
 **What**: Add the snapshot, configuration, list, operation-result, operation-error, and protocol-error response models with their exact serialization.
 **Where**: `src/task-analyzer-server/task_analyzer_server/contracts.py` (modify)
@@ -475,14 +475,14 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] `TaskSnapshot` exposes exactly `task_id`, `title`, `observations`, `deadline`, `status`, `created_at`, and `completed_at`; internal comparison and deletion fields are never exposed.
-- [ ] `ConfigurationView` and the task-list response carry the configured flag or zone, `server_now`, and `product_date`, with an empty `items` array for an empty collection.
-- [ ] `OperationResult` carries `operation_id`, `outcome`, `original_http_status`, nullable `task`, nullable `error`, and `resolved_at`, with exactly one of `task` and `error` non-null, asserted in both directions.
-- [ ] `OperationError` carries a stable `code`, a `fields` array of field and code pairs that is empty for a non-field error, and a nullable `conflicting_task_id`; `ProtocolError` contains exactly `request_id`, `error` (code and fields), and `operation_id` only for a usable supplied ID, with no terminal `outcome`.
-- [ ] UTC instants serialize with an explicit `Z` suffix and six fractional digits; deadlines serialize as `YYYY-MM-DD`; UUIDs serialize as canonical lowercase hyphenated text.
-- [ ] A test asserts that the design's example persisted creation result serializes field for field.
-- [ ] Gate check passes: `python -m pytest tests/server/unit`.
-- [ ] Test count: at least 18 tests pass in `tests/server/unit/test_contracts_results.py` (no silent deletions).
+- [x] `TaskSnapshot` exposes exactly `task_id`, `title`, `observations`, `deadline`, `status`, `created_at`, and `completed_at`; internal comparison and deletion fields are never exposed.
+- [x] `ConfigurationView` and the task-list response carry the configured flag or zone, `server_now`, and `product_date`, with an empty `items` array for an empty collection.
+- [x] `OperationResult` carries `operation_id`, `outcome`, `original_http_status`, nullable `task`, nullable `error`, and `resolved_at`, with exactly one of `task` and `error` non-null, asserted in both directions.
+- [x] `OperationError` carries a stable `code`, a `fields` array of field and code pairs that is empty for a non-field error, and a nullable `conflicting_task_id`; `ProtocolError` contains exactly `request_id`, `error` (code and fields), and `operation_id` only for a usable supplied ID, with no terminal `outcome`.
+- [x] UTC instants serialize with an explicit `Z` suffix and six fractional digits; deadlines serialize as `YYYY-MM-DD`; UUIDs serialize as canonical lowercase hyphenated text.
+- [x] A test asserts that the design's example persisted creation result serializes field for field.
+- [x] Gate check passes: `python -m pytest tests/server/unit`.
+- [x] Test count: at least 18 tests pass in `tests/server/unit/test_contracts_results.py` (no silent deletions).
 
 **Tests**: unit
 **Gate**: quick
