@@ -20,7 +20,7 @@ Approved product inputs remain in [Requirements](../docs/product/requirements.md
 - **Trade-off**: Request/response with an operation ledger keeps the desktop responsible for repetition and refresh, and indefinite result retention trades storage for the guarantee that a late repeated attempt never becomes a new operation.
 - **Scope**: Server features and their shared persistence, operation, time, logging, and quality contracts. Exact dependency versions, deployment values, and client technology remain outside this entry.
 - **Date**: 2026-09-13.
-- **Status**: active.
+- **Status**: active; dependency locking with pip-tools is superseded by AD-004.
 
 ### AD-003
 
@@ -31,21 +31,24 @@ Approved product inputs remain in [Requirements](../docs/product/requirements.md
 - **Date**: 2026-09-13.
 - **Status**: active.
 
+### AD-004
+
+- **Decision**: Use lightweight SDD inspired by TLC and uv-managed dependencies/environments. Remove mandatory TLC automation, test-count quotas and blanket verbose docstrings.
+- **Reason**: The user approved simplification after the first delivery exposed disproportionate content and context-loading cost for a personal learning/portfolio project.
+- **Trade-off**: Keep behavior-based specifications, tests and review, while replacing generated process artifacts with concise guidance and Git history. The bundled TLC remains optional study material.
+- **Scope**: Repository workflow and dependency management; supersedes pip-tools in AD-002, preserving its server contracts and other tools.
+- **Date**: 2026-09-14.
+- **Status**: active.
+
 ## Handoff
 
-- **Feature**: [Persistent task creation and editing](features/persistent-task-creation-editing/spec.md), delivery 1A.
-- **Phase / Task**: New feature work paused by the user on 2026-09-14. The completed code audit remains **FAIL** for reproduced local defects and missing target-host evidence. Current work is to reassess the project's development process and excessive documentation/test volume before continuing implementation.
-- **User priorities**: This is a personal, educational and portfolio project. Keep the implementation understandable and the development workflow proportionate; the current content volume and context-loading cost are unacceptable to the user. This priority does not silently remove approved behavior or protected test scenarios.
-- **Completed**: The 31 implementation tasks remain committed, followed by the earlier validation fix and handoff at `aa59004`. This audit changes documentation and script-managed lessons only; application code and provided tests are unchanged.
-- **Findings**: Concurrent initialization can delete the database created by the winning initializer; synchronous SQLite calls block the event loop in async routes; invalid JSON numbers escape as HTTP 500; and task-list reads can combine tasks with an obsolete unset product zone. Runtime logging also retains Uvicorn's plain-text handlers. See the ranked findings and proposed fix tasks in [validation.md](features/persistent-task-creation-editing/validation.md).
-- **Checks**: Fresh hash-locked Python 3.13 environment: 588 tests passed, 0 failed, 0 skipped; Ruff formatting/lint, strict mypy, dependency consistency and package build passed. A disposable source copy also passed all 588 tests. Nine behavior mutations were killed, with no survivors. Import provenance was pinned to that copy and real-tree porcelain matched before and after the sensor.
-- **Verification**: Audit scope `127d777..aa59004`, including the pre-existing untracked cache directories. Both the main reviewer and independent Verifier reproduced all four functional findings using disposable databases. Passing existing tests does not close these missing scenarios. No requirement is promoted to Verified.
-- **Next step**: Explain the causes of the excessive volume, then agree on a concise simplification scope for repository instructions, documentation, local setup and test organization. Keep the audit findings visible in that scope. Do not start new features or execute a broad rewrite or test deletion from this pause instruction.
-- **Deployment checkpoint**: PCE-47 and PCE-44's actual Ubuntu interpreter check remain pending. No host was contacted, deployment performed, or real database modified. Target values and deployment/database authorization remain required.
-- **Authorization**: This session authorizes the audit and its local evidence artifacts. Existing implementation authorization remains recorded in the approved plan; no push, merge, deployment or destructive action is authorized.
-- **Uncommitted files**: Audit report, this Handoff and script-managed lesson updates; the pre-existing untracked `__pycache__/` directories remain. Reconcile Git on resume.
-- **Lessons**: New audit signals are recorded through the installed `lessons.py`; consult the canonical store for current candidate status. No lesson is promoted merely by recurring within this same feature.
-- **Branch**: `docs/1a-code-audit`, created from `feat/persistent-task-creation-editing` at `aa59004`. Not pushed or merged.
+- **Work**: Approved project simplification; new features paused. See [maintenance](../docs/maintenance.md) for scope and progress.
+- **Branch**: `fix/project-simplification`, based on the preserved audit at `8c68d6a`.
+- **Next step**: Configure uv and the local environment, fix F1-F5, then consolidate tests and documentation.
+- **Baseline**: 588 tests pass; audit found four functional defects and one logging defect. Original evidence is in Git at `8c68d6a`.
+- **Authorization**: Local maintenance implementation and commits. No push, merge, deployment or real database changes.
+- **Existing local change**: `.specs/features/.gitkeep` was already deleted before maintenance; preserve it separately from maintenance commits.
+- **External checks**: Actual Ubuntu interpreter/lock and Tailscale access remain pending; no full feature PASS is claimed.
 
 ## Open questions
 
