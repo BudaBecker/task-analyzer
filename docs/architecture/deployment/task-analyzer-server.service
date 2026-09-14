@@ -1,0 +1,75 @@
+# Proposed systemd unit for the Task Analyzer Server.
+#
+# This file is a local asset. Installing it, creating the account or the
+# state directory, and starting the service are deployment steps that
+# require explicit authorization at the time they are run. See
+# server.md for the procedure and for the values still to be confirmed
+# on the target host.
+#
+# Install to /etc/systemd/system/task-analyzer-server.service.
+
+[Unit]
+Description=Task Analyzer Server
+Documentation=file:///opt/task-analyzer/docs/architecture/deployment/server.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+
+# Dedicated unprivileged account. It owns no login shell and is created
+# during deployment, not by this file.
+User=task-analyzer
+Group=task-analyzer
+
+# One Uvicorn worker bound to loopback only. Tailscale Serve is the
+# tailnet-only HTTPS front end for this listener; the port is never
+# published directly. No development reload.
+WorkingDirectory=/opt/task-analyzer
+ExecStart=/opt/task-analyzer/venv/bin/python -m uvicorn \
+    task_analyzer_server.app:application_factory --factory \
+    --host 127.0.0.1 --port 8000
+
+# The approved runtime environment. The database path is required and
+# absolute; the application never falls back to another database, and
+# it never initializes one. The one-time initialization is a separate,
+# separately authorized step.
+Environment=TASK_ANALYZER_DATABASE_PATH=/var/lib/task-analyzer/task-analyzer.sqlite3
+Environment=TASK_ANALYZER_LOG_LEVEL=INFO
+Environment=TASK_ANALYZER_DB_BUSY_TIMEOUT_MS=5000
+
+# Writable state directory, created and owned by systemd as
+# /var/lib/task-analyzer. The SQLite database and its rollback journal
+# stay together on this local filesystem.
+StateDirectory=task-analyzer
+StateDirectoryMode=0750
+
+# Restart on failure, with a bounded restart rate so a persistent fault
+# is visible rather than silently looping.
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# The installed application is read-only to the service. Only the state
+# directory is writable.
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/task-analyzer
+PrivateTmp=true
+NoNewPrivileges=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictSUIDSGID=true
+LockPersonality=true
+
+# JSON-line records go to the journal through standard output.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=task-analyzer-server
+
+[Install]
+WantedBy=multi-user.target

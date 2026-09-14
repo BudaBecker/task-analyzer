@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "task-analyzer-server"
+version = "0.1.0"
+description = "Task Analyzer server: persistent task creation and editing."
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic>=2",
+    "regex",
+    "tzdata",
+]
+
+[dependency-groups]
+dev = ["pytest", "httpx", "ruff", "mypy", "setuptools", "build"]
+
+[tool.setuptools]
+package-dir = { "" = "src/task-analyzer-server" }
+
+[tool.setuptools.packages.find]
+where = ["src/task-analyzer-server"]
+include = ["task_analyzer_server*"]
+
+[tool.setuptools.package-data]
+task_analyzer_server = ["schema/*.sql"]
+
+[tool.ruff]
+line-length = 79
+target-version = "py313"
+extend-exclude = [".ai"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["task_analyzer_server"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["src/task-analyzer-server/task_analyzer_server"]
+exclude = "^\\.ai/"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/server"]

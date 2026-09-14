@@ -20,7 +20,7 @@ Approved product inputs remain in [Requirements](../docs/product/requirements.md
 - **Trade-off**: Request/response with an operation ledger keeps the desktop responsible for repetition and refresh, and indefinite result retention trades storage for the guarantee that a late repeated attempt never becomes a new operation.
 - **Scope**: Server features and their shared persistence, operation, time, logging, and quality contracts. Exact dependency versions, deployment values, and client technology remain outside this entry.
 - **Date**: 2026-09-13.
-- **Status**: active.
+- **Status**: active; dependency locking with pip-tools is superseded by AD-004.
 
 ### AD-003
 
@@ -31,17 +31,24 @@ Approved product inputs remain in [Requirements](../docs/product/requirements.md
 - **Date**: 2026-09-13.
 - **Status**: active.
 
+### AD-004
+
+- **Decision**: Use lightweight SDD inspired by TLC and uv-managed dependencies/environments. Remove mandatory TLC automation, test-count quotas and blanket verbose docstrings.
+- **Reason**: The user approved simplification after the first delivery exposed disproportionate content and context-loading cost for a personal learning/portfolio project.
+- **Trade-off**: Keep behavior-based specifications, tests and review, while replacing generated process artifacts with concise guidance and Git history. The bundled TLC remains optional study material.
+- **Scope**: Repository workflow and dependency management; supersedes pip-tools in AD-002, preserving its server contracts and other tools.
+- **Date**: 2026-09-14.
+- **Status**: active.
+
 ## Handoff
 
-- **Feature**: [Persistent task creation and editing](features/persistent-task-creation-editing/spec.md), delivery 1A of the server lifecycle group.
-- **Phase / Task**: Tasks drafted and revised; awaiting user approval. No implementation has started and no task is in progress.
-- **Completed**: Approved 1A specification; approved detailed Design (2026-09-13) recorded in [AD-002](#ad-002); formal `tasks.md` with 31 atomic tasks in 9 phases. On 2026-09-13 the user also adopted TLC's commit standard in [AGENTS.md](../AGENTS.md#branches-and-authorization), confirmed that no MCP server or additional skill is needed, and raised the runtime baseline to Python 3.13+ ([AD-003](#ad-003)), propagated to REQ-003, PCE-44, the design, and T1/T2.
-- **In-progress** (file:line): `features/persistent-task-creation-editing/tasks.md:19` marks the task plan as Draft awaiting approval. `python .ai/skills/tlc-spec-driven/scripts/validate_tasks.py` reports 0 errors and 4 expected `Tests: none` warnings for the packaging and deployment-asset tasks.
-- **Next step**: Obtain task approval, then answer the sub-agent offer at Execute (31 tasks pack into more than one batch) before implementing T1. Each completed task now ends in its own atomic Conventional Commit.
-- **Deployment target**: The user's own Ubuntu server, confirmed 2026-09-13. No disposable validation host is used, so PCE-46/PCE-47 evidence and every install, service, Tailscale, and database-initialization step wait for step-level authorization and the host values the user still has to supply.
-- **Blockers**: None for task approval. Exact dependency versions are resolved in T2 against the interpreter the Ubuntu target provides; the private-access checks in PCE-46/47 need an explicitly authorized environment and are not performed by any task.
-- **Uncommitted files**: `AGENTS.md`, `README.md`, `docs/product/requirements.md`, and `.specs/STATE.md` modified; `spec.md`, `design.md`, and `tasks.md` are present in the untracked feature directory. No commit has been made for this work; the new commit standard applies to task execution.
-- **Branch**: `docs/persistent-task-creation-editing`. Git history ends at `2fafba2`; reconcile Git again on resume rather than relying on earlier conversational snapshots.
+- **Work**: Approved project simplification is complete locally; new features remain paused pending review. See [maintenance](../docs/maintenance.md) for results.
+- **Branch**: `fix/project-simplification`, based on the preserved audit at `8c68d6a`.
+- **Next step**: Review the simplification report and decide when to resume feature planning under lightweight SDD.
+- **Result**: uv and `.venv` are established; F1-F5 are fixed; active documentation, source commentary and duplicate tests are reduced. The final 393-case suite and quality/build checks pass.
+- **Authorization**: Local maintenance implementation and commits. No push, merge, deployment or real database changes.
+- **Existing local change**: `.specs/features/.gitkeep` was already deleted before maintenance; preserve it separately from maintenance commits.
+- **External checks**: Actual Ubuntu interpreter/lock and Tailscale access remain pending; local maintenance completion does not claim deployment verification.
 
 ## Open questions
 

@@ -1,0 +1,493 @@
+"""Integration tests for concurrency and injected failures.
+
+Covers PCE-19, PCE-20, PCE-27, PCE-37, PCE-39, PCE-42, PCE-43; REQ-010,
+REQ-029, REQ-031.
+"""
+
+import sqlite3
+import subprocess
+import sys
+import threading
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from datetime import UTC, datetime
+from pathlib import Path
+from uuid import UUID, uuid4
+
+import pytest
+from helpers import FixedClock
+from test_durability import initialized_database
+
+from task_analyzer_server import services, storage
+from task_analyzer_server.contracts import (
+    ErrorCode,
+    OperationRequest,
+    OperationResult,
+)
+from task_analyzer_server.settings import ServerSettings
+
+BUSY_TIMEOUT_MS = 5000
+IMPATIENT_TIMEOUT_MS = 50
+
+READY_TIMEOUT_SECONDS = 60.0
+
+PRODUCT_ZONE = "America/Sao_Paulo"
+SERVER_NOW = datetime(2026, 9, 14, 12, 0, 0, 123456, tzinfo=UTC)
+
+TASKS_TARGET = "/v1/tasks"
+TASK_TITLE = "Read notes"
+OTHER_TITLE = "Review the draft"
+HELD_TITLE = "Held by the stopped process"
+DEADLINE = "2026-09-14"
+
+COMMITTED_EXIT_CODE = 9
+
+COUNT_TASKS = "SELECT COUNT(*) FROM tasks WHERE is_deleted = 0"
+COUNT_RESULTS = "SELECT COUNT(*) FROM operation_results"
+
+HOLDER_PROGRAM = '''"""Hold one uncommitted write transaction open.
+
+The rows below are written inside the transaction and never committed.
+The process announces that it holds the write lock and then blocks, so
+the test decides when it stops.
+"""
+
+import sys
+from pathlib import Path
+
+from task_analyzer_server import storage
+
+INSERT_TASK = (
+    "INSERT INTO tasks (task_id, title, title_key, observations,"
+    " deadline_date, status, created_at_us, latest_completed_at_us,"
+    " is_deleted) VALUES (?, ?, ?, NULL, NULL, 'pending', 0, NULL, 0)"
+)
+INSERT_RESULT = (
+    "INSERT INTO operation_results (operation_id, canonical_request,"
+    " outcome, http_status, serialized_result, resolved_at_us)"
+    " VALUES (?, 'held', 'succeeded', 201, '{}', 0)"
+)
+
+database, operation_id, task_id, title = sys.argv[1:5]
+with storage.open_connection(Path(database), 5000) as connection:
+    connection.execute("BEGIN IMMEDIATE")
+    connection.execute(INSERT_TASK, (task_id, title, title))
+    connection.execute(INSERT_RESULT, (operation_id,))
+    print("ready", flush=True)
+    sys.stdin.readline()
+'''
+
+COMMITTER_PROGRAM = '''"""Commit one creation, then stop before answering.
+
+The process ends the moment the operation is committed, so no response
+can reach anyone. The outcome must still be discoverable afterwards.
+"""
+
+import os
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
+from uuid import UUID
+
+from task_analyzer_server import services
+from task_analyzer_server.contracts import OperationRequest
+from task_analyzer_server.settings import ServerSettings
+
+
+class FrozenClock:
+    """A clock reporting one instant."""
+
+    def now(self) -> datetime:
+        """Read that instant.
+
+        Returns:
+            The instant this clock always reports.
+        """
+        return datetime(2026, 9, 14, 12, 0, 0, 123456, tzinfo=UTC)
+
+
+database, operation_id, title = sys.argv[1:4]
+services.create_task(
+    ServerSettings(
+        database_path=Path(database),
+        log_level="INFO",
+        db_busy_timeout_ms=5000,
+    ),
+    FrozenClock(),
+    OperationRequest(
+        operation_id=UUID(operation_id),
+        method="POST",
+        target="/v1/tasks",
+        payload={"title": title},
+    ),
+)
+os._exit(9)
+'''
+
+
+def settings_for(
+    database: Path, busy_timeout_ms: int = BUSY_TIMEOUT_MS
+) -> ServerSettings:
+    return ServerSettings(
+        database_path=database,
+        log_level="INFO",
+        db_busy_timeout_ms=busy_timeout_ms,
+    )
+
+
+@pytest.fixture
+def database(tmp_path: Path) -> Path:
+    target = initialized_database(tmp_path)
+    services.configure_zone(
+        settings_for(target), FixedClock(SERVER_NOW), PRODUCT_ZONE
+    )
+    return target
+
+
+@pytest.fixture
+def settings(database: Path) -> ServerSettings:
+    return settings_for(database)
+
+
+def creation(operation_id: UUID, payload: object) -> OperationRequest:
+    return OperationRequest(
+        operation_id=operation_id,
+        method="POST",
+        target=TASKS_TARGET,
+        payload=payload,
+    )
+
+
+def run_together(
+    first: Callable[[], OperationResult],
+    second: Callable[[], OperationResult],
+) -> tuple[object, object]:
+    barrier = threading.Barrier(2)
+    outcomes: dict[int, object] = {}
+
+    def run(index: int, attempt: Callable[[], OperationResult]) -> None:
+        barrier.wait()
+        try:
+            outcomes[index] = attempt()
+        except BaseException as failure:
+            outcomes[index] = failure
+
+    threads = [
+        threading.Thread(target=run, args=(index, attempt))
+        for index, attempt in enumerate((first, second))
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    return outcomes[0], outcomes[1]
+
+
+@contextmanager
+def holding_write_lock(
+    database: Path, workspace: Path, operation_id: UUID, task_id: UUID
+) -> Iterator["subprocess.Popen[str]"]:
+    program = workspace / "hold_transaction.py"
+    program.write_text(HOLDER_PROGRAM, encoding="utf-8")
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            str(program),
+            str(database),
+            str(operation_id),
+            str(task_id),
+            HELD_TITLE,
+        ],
+        cwd=str(workspace),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert process.stdout is not None
+        announcement = process.stdout.readline()
+        assert announcement.strip() == "ready", (
+            "The helper never took the write lock:"
+            f" {'' if process.stderr is None else process.stderr.read()}"
+        )
+        yield process
+    finally:
+        process.kill()
+        process.wait(timeout=READY_TIMEOUT_SECONDS)
+
+
+def commit_then_stop(
+    database: Path, workspace: Path, operation_id: UUID, title: str
+) -> int:
+    program = workspace / "commit_then_stop.py"
+    program.write_text(COMMITTER_PROGRAM, encoding="utf-8")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(program),
+            str(database),
+            str(operation_id),
+            title,
+        ],
+        cwd=str(workspace),
+        capture_output=True,
+        text=True,
+        timeout=READY_TIMEOUT_SECONDS,
+        check=False,
+    )
+    assert completed.returncode == COMMITTED_EXIT_CODE, (
+        f"The helper stopped with {completed.returncode}:"
+        f" {completed.stdout}{completed.stderr}"
+    )
+    return completed.returncode
+
+
+def counted(database: Path, statement: str) -> int:
+    with storage.open_connection(database, BUSY_TIMEOUT_MS) as connection:
+        return int(connection.execute(statement).fetchone()[0])
+
+
+def accepted_and_rejected(
+    outcomes: tuple[object, object],
+) -> tuple[OperationResult, OperationResult]:
+    results = [item for item in outcomes if isinstance(item, OperationResult)]
+    assert len(results) == 2, f"Both attempts must settle: {outcomes}"
+    succeeded = [item for item in results if item.outcome == "succeeded"]
+    rejected = [item for item in results if item.outcome == "rejected"]
+    assert len(succeeded) == 1
+    assert len(rejected) == 1
+    return succeeded[0], rejected[0]
+
+
+def test_two_copies_of_one_attempt_create_one_task(
+    settings: ServerSettings, database: Path
+) -> None:
+    identity = uuid4()
+    payload = {"title": TASK_TITLE, "deadline": DEADLINE}
+
+    run_together(
+        lambda: services.create_task(
+            settings, FixedClock(SERVER_NOW), creation(identity, payload)
+        ),
+        lambda: services.create_task(
+            settings, FixedClock(SERVER_NOW), creation(identity, payload)
+        ),
+    )
+
+    assert counted(database, COUNT_TASKS) == 1
+
+
+def test_two_copies_of_one_attempt_report_the_same_result(
+    settings: ServerSettings,
+) -> None:
+    identity = uuid4()
+    payload = {"title": TASK_TITLE, "deadline": DEADLINE}
+
+    first, second = run_together(
+        lambda: services.create_task(
+            settings, FixedClock(SERVER_NOW), creation(identity, payload)
+        ),
+        lambda: services.create_task(
+            settings, FixedClock(SERVER_NOW), creation(identity, payload)
+        ),
+    )
+
+    assert isinstance(first, OperationResult)
+    assert isinstance(second, OperationResult)
+    assert first == second
+    assert first.outcome == "succeeded"
+
+
+def test_two_copies_of_one_attempt_retain_one_result(
+    settings: ServerSettings, database: Path
+) -> None:
+    identity = uuid4()
+    payload = {"title": TASK_TITLE}
+
+    run_together(
+        lambda: services.create_task(
+            settings, FixedClock(SERVER_NOW), creation(identity, payload)
+        ),
+        lambda: services.create_task(
+            settings, FixedClock(SERVER_NOW), creation(identity, payload)
+        ),
+    )
+
+    assert counted(database, COUNT_RESULTS) == 1
+
+
+def test_two_conflicting_operations_accept_one_task_at_most(
+    settings: ServerSettings, database: Path
+) -> None:
+    payload = {"title": TASK_TITLE, "deadline": DEADLINE}
+
+    outcomes = run_together(
+        lambda: services.create_task(
+            settings, FixedClock(SERVER_NOW), creation(uuid4(), payload)
+        ),
+        lambda: services.create_task(
+            settings, FixedClock(SERVER_NOW), creation(uuid4(), payload)
+        ),
+    )
+    accepted, _ = accepted_and_rejected(outcomes)
+
+    assert counted(database, COUNT_TASKS) == 1
+    assert accepted.task is not None
+
+
+def test_the_refused_conflicting_operation_names_the_conflict(
+    settings: ServerSettings,
+) -> None:
+    payload = {"title": TASK_TITLE, "deadline": DEADLINE}
+
+    outcomes = run_together(
+        lambda: services.create_task(
+            settings, FixedClock(SERVER_NOW), creation(uuid4(), payload)
+        ),
+        lambda: services.create_task(
+            settings, FixedClock(SERVER_NOW), creation(uuid4(), payload)
+        ),
+    )
+    accepted, rejected = accepted_and_rejected(outcomes)
+
+    assert rejected.error is not None
+    assert rejected.error.code == ErrorCode.TASK_UNIQUENESS_CONFLICT
+    assert accepted.task is not None
+    assert rejected.error.conflicting_task_id == accepted.task.task_id
+
+
+def test_a_conflicting_operation_is_not_treated_as_a_replay(
+    settings: ServerSettings, database: Path
+) -> None:
+    first_id = uuid4()
+    second_id = uuid4()
+    payload = {"title": TASK_TITLE, "deadline": DEADLINE}
+
+    outcomes = run_together(
+        lambda: services.create_task(
+            settings, FixedClock(SERVER_NOW), creation(first_id, payload)
+        ),
+        lambda: services.create_task(
+            settings, FixedClock(SERVER_NOW), creation(second_id, payload)
+        ),
+    )
+    accepted, rejected = accepted_and_rejected(outcomes)
+
+    assert {accepted.operation_id, rejected.operation_id} == {
+        first_id,
+        second_id,
+    }
+    assert counted(database, COUNT_RESULTS) == 2
+
+
+def test_a_stop_before_commit_leaves_no_committed_task(
+    database: Path, tmp_path: Path
+) -> None:
+    with holding_write_lock(database, tmp_path, uuid4(), uuid4()):
+        pass
+
+    assert counted(database, COUNT_TASKS) == 0
+
+
+def test_a_stop_before_commit_leaves_no_committed_result(
+    database: Path, tmp_path: Path
+) -> None:
+    with holding_write_lock(database, tmp_path, uuid4(), uuid4()):
+        pass
+
+    assert counted(database, COUNT_RESULTS) == 0
+
+
+def test_the_same_attempt_still_settles_after_a_stop(
+    settings: ServerSettings, database: Path, tmp_path: Path
+) -> None:
+    identity = uuid4()
+    with holding_write_lock(database, tmp_path, identity, uuid4()):
+        pass
+
+    result = services.create_task(
+        settings,
+        FixedClock(SERVER_NOW),
+        creation(identity, {"title": TASK_TITLE}),
+    )
+
+    assert result.outcome == "succeeded"
+    assert services.lookup_operation(settings, identity) == result
+    assert counted(database, COUNT_TASKS) == 1
+
+
+def test_an_outcome_committed_before_a_stop_is_discoverable(
+    settings: ServerSettings, database: Path, tmp_path: Path
+) -> None:
+    identity = uuid4()
+
+    commit_then_stop(database, tmp_path, identity, TASK_TITLE)
+    retained = services.lookup_operation(settings, identity)
+
+    assert retained is not None
+    assert retained.outcome == "succeeded"
+    assert counted(database, COUNT_TASKS) == 1
+
+
+def test_a_committed_outcome_is_not_applied_twice(
+    settings: ServerSettings, database: Path, tmp_path: Path
+) -> None:
+    identity = uuid4()
+    commit_then_stop(database, tmp_path, identity, TASK_TITLE)
+    retained = services.lookup_operation(settings, identity)
+
+    repeated = services.create_task(
+        settings,
+        FixedClock(SERVER_NOW),
+        creation(identity, {"title": TASK_TITLE}),
+    )
+
+    assert repeated == retained
+    assert counted(database, COUNT_TASKS) == 1
+    assert counted(database, COUNT_RESULTS) == 1
+
+
+def test_a_lock_timeout_is_an_infrastructure_failure(
+    database: Path, tmp_path: Path
+) -> None:
+    impatient = settings_for(database, IMPATIENT_TIMEOUT_MS)
+
+    with holding_write_lock(database, tmp_path, uuid4(), uuid4()):
+        with pytest.raises(sqlite3.OperationalError) as failure:
+            services.create_task(
+                impatient,
+                FixedClock(SERVER_NOW),
+                creation(uuid4(), {"title": OTHER_TITLE}),
+            )
+
+    assert not isinstance(failure.value, services.ProtocolRefusalError)
+
+
+def test_a_lock_timeout_establishes_no_terminal_result(
+    database: Path, tmp_path: Path
+) -> None:
+    impatient = settings_for(database, IMPATIENT_TIMEOUT_MS)
+    identity = uuid4()
+
+    with holding_write_lock(database, tmp_path, uuid4(), uuid4()):
+        with pytest.raises(sqlite3.OperationalError):
+            services.create_task(
+                impatient,
+                FixedClock(SERVER_NOW),
+                creation(identity, {"title": OTHER_TITLE}),
+            )
+
+    assert services.lookup_operation(impatient, identity) is None
+    assert counted(database, COUNT_TASKS) == 0
+
+
+def test_lookup_during_in_flight_work_is_unknown_not_rejected(
+    settings: ServerSettings, database: Path, tmp_path: Path
+) -> None:
+    identity = uuid4()
+
+    with holding_write_lock(database, tmp_path, identity, uuid4()):
+        in_flight = services.lookup_operation(settings, identity)
+
+    assert in_flight is None

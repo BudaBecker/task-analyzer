@@ -2,7 +2,7 @@
 
 This document defines product behavior and acceptance scenarios for the [MVP scope](scope.md). Requirement IDs identify the inputs for future specifications and tests. The scenarios below are documentation, not executed tests.
 
-The Task Analyzer Server owns business rules, persistence, and calculations. The Desktop App collects input and presents server results. [User flows](user-flows.md) describes interaction sequences, and [Domain vocabulary](domain.md) defines shared terms.
+The Task Analyzer Server owns business rules, persistence, and calculations. The Desktop App collects input and presents server results. This document includes the detailed interaction sequences; [MVP scope](scope.md#learning-goals-and-vocabulary) defines the shared vocabulary.
 
 ## Platform and access
 
@@ -16,7 +16,7 @@ The Task Analyzer Server owns business rules, persistence, and calculations. The
 
 | ID | Requirement | Acceptance scenario |
 | --- | --- | --- |
-| REQ-007 | A task has a required title of at most 200 characters after trimming leading/trailing spaces, optional description/observations of at most 5,000 characters with line breaks allowed, an optional calendar-date deadline, and pending/completed status. Reject empty or whitespace-only titles. Past deadlines are allowed. New tasks are pending. | A title-only task is accepted as pending. The server accepts a 200-character title and 5,000-character observations, rejects 201 and 5,001 characters respectively, and rejects a blank title. A valid past deadline is accepted. |
+| REQ-007 | A task has a required title of at most 200 characters after trimming leading/trailing spaces, optional description/observations of at most 5,000 characters with line breaks allowed, an optional calendar-date deadline, and pending/completed status. Reject empty or whitespace-only titles. Past deadlines within the supported range are allowed. Deadline dates range from `0001-01-01` through `9999-12-30`, inclusive; reject dates outside that range. New tasks are pending. | A title-only task is accepted as pending. The server accepts a 200-character title and 5,000-character observations, rejects 201 and 5,001 characters respectively, and rejects a blank title. A valid past deadline is accepted. |
 | REQ-008 | Allow creation, editing, completion, reopening, and deletion through the desktop. The server applies lifecycle rules and rejects changes that violate task validation or uniqueness. | A valid pending task can be edited, completed, and reopened. A rejected change leaves the task's persisted state unchanged. |
 | REQ-009 | Allow description/observation edits on completed tasks without reopening, preserving completion time. Require reopening before changing their title or deadline. | Editing a completed task's observations leaves its completion measurements unchanged; changing its deadline requires a successful reopening first. |
 | REQ-010 | Persist task data and lifecycle changes in the server. Changes confirmed as persisted survive closing/reopening the desktop and restarting the server. | After a successful save, restarting either component retains the task change. Desktop confirmation follows the operation-outcome rules in REQ-031. |
@@ -30,7 +30,9 @@ For REQ-007, character limits count user-perceived characters, not bytes or Unic
 | REQ-028 | The server uses its clock to record original creation time and each completion time when applying the corresponding operation. Obtain the product time zone from the desktop during initial configuration and retain it in the server. The zone remains fixed in the MVP. Use server time in that zone to determine the current product date. | Changing the desktop's clock or time zone after initial configuration does not change server timestamps, deadline interpretation, or historical calculations. Restarting the server retains the configured zone. |
 | REQ-011 | Interpret a deadline as a calendar date whose cutoff is midnight immediately after that date in the product time zone. A pending task becomes overdue at the cutoff. A completion at or after the cutoff is late. | A September 14 deadline remains valid throughout September 14. At September 15, 00:00 in the product time zone, a pending task is overdue and a completion is late. |
 
-For REQ-011, if midnight immediately after the deadline date occurs twice because of a time-zone transition, use its first occurrence. If that midnight does not exist, use the first valid instant of the following date. These exceptional cases do not change the ordinary September 14/15 acceptance scenario.
+For REQ-011, if midnight immediately after the deadline date occurs twice because of a time-zone transition, use its first occurrence. If that midnight does not exist, use the first valid instant at or after that nominal calendar boundary. If the entire following date is skipped, use the first instant after the skipped date. For example, a `2011-12-29` deadline in `Pacific/Apia` expires at `2011-12-31T00:00:00+14:00` (`2011-12-30T10:00:00Z`). These exceptional cases do not change the ordinary September 14/15 acceptance scenario.
+
+The user approved the skipped-date clarification and the inclusive `0001-01-01` through `9999-12-30` deadline range during the 1A audit correction. Reject `9999-12-31`; the range leaves a representable next-day cutoff under the chosen server time representation. Preserve the original valid-past-date and invalid-calendar-date scenarios and add explicit range-boundary scenarios.
 
 ## Task uniqueness
 
