@@ -15,6 +15,9 @@ dependencies = [
     "tzdata",
 ]
 
+[dependency-groups]
+dev = ["pytest", "httpx", "ruff", "mypy", "setuptools", "build"]
+
 [tool.setuptools]
 package-dir = { "" = "src/task-analyzer-server" }
 
@@ -31,10 +34,7 @@ target-version = "py313"
 extend-exclude = [".ai"]
 
 [tool.ruff.lint]
-select = ["D", "E", "F", "I"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
+select = ["E", "F", "I"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["task_analyzer_server"]

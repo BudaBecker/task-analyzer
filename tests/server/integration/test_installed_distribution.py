@@ -30,7 +30,6 @@ import httpx
 import pytest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-RUNTIME_LOCK = REPOSITORY_ROOT / "requirements" / "server-py313.txt"
 
 RUNTIME_ENTRY = "task_analyzer_server.app:application_factory"
 HOST = "127.0.0.1"
@@ -146,20 +145,46 @@ def installed_python(
     """
     home = tmp_path_factory.mktemp("installed-environment")
     environment = home / "runtime"
-    _run([sys.executable, "-m", "venv", str(environment)])
+    _run(["uv", "venv", "--python", sys.executable, str(environment)])
+    runtime_lock = home / "requirements.txt"
+    _run(
+        [
+            "uv",
+            "export",
+            "--locked",
+            "--no-dev",
+            "--no-emit-project",
+            "--format",
+            "requirements-txt",
+            "--output-file",
+            str(runtime_lock),
+        ],
+        cwd=REPOSITORY_ROOT,
+    )
     python = _environment_python(environment)
     _run(
         [
-            str(python),
-            "-m",
+            "uv",
             "pip",
             "install",
+            "--python",
+            str(python),
             "--require-hashes",
             "-r",
-            str(RUNTIME_LOCK),
+            str(runtime_lock),
         ]
     )
-    _run([str(python), "-m", "pip", "install", "--no-deps", str(built_wheel)])
+    _run(
+        [
+            "uv",
+            "pip",
+            "install",
+            "--python",
+            str(python),
+            "--no-deps",
+            str(built_wheel),
+        ]
+    )
     return python
 
 

@@ -11,7 +11,7 @@ The original implementation and audit are preserved in Git at `8c68d6a`. Histori
 ## Steps
 
 - [x] Simplify project instructions and document the approved process/tooling change.
-- [ ] Establish uv, a persistent ignored .venv and repeatable setup/build commands.
+- [x] Establish uv, a persistent ignored .venv and repeatable setup/build commands.
 - [ ] Fix initialization ownership, blocking routes, JSON number handling, read consistency and runtime logging, with regressions.
 - [ ] Consolidate explanatory text and shared test setup while preserving scenarios.
 - [ ] Refresh feature/product documentation, run full checks and report measured results.
@@ -21,6 +21,8 @@ The original implementation and audit are preserved in Git at `8c68d6a`. Histori
 Run the full suite, Ruff formatting/lint, strict mypy, dependency checks, package build and installed-wheel smoke tests. Compare original test bodies/inputs during consolidation. Keep target-interpreter and Tailscale evidence pending.
 
 ## Results
+
+uv migration: the persistent .venv is installed and all 588 original cases pass, including installed-wheel startup/restart. Runtime and retained development dependency versions match the original locks.
 
 Work in progress. Baseline: 11 Python source files / 3,760 lines; 29 test files / 11,973 lines; 588 executed test cases. Final measurements and checks will replace this paragraph.
 
