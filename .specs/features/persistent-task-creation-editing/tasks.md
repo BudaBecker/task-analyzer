@@ -674,7 +674,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T19: Implement the task creation command
+### T19: Implement the task creation command [Complete]
 
 **What**: Add the creation command applying validation, identity assignment, server-clock creation time, and the stored terminal result.
 **Where**: `src/task-analyzer-server/task_analyzer_server/services.py` (modify)
@@ -689,13 +689,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] A valid title-only creation produces a pending task without observations or deadline; optional values, multiline observations, and past deadlines persist exactly as supplied.
-- [ ] Creation time is sampled from the server clock after write access is acquired, and the task receives a server-generated UUID identity.
-- [ ] A validation rejection stores its terminal result and creates no task.
-- [ ] Success is reported only after the mutation and its result commit together.
-- [ ] Integration tests carry the approved boundary fixtures through the command, including 200/201 title clusters, 5,000/5,001 observation clusters, whitespace-only titles, invalid calendar dates, combined-character cases, both accepted date endpoints, and rejected `9999-12-31`.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 20 tests pass in `tests/server/integration/test_services_create.py` (no silent deletions).
+- [x] A valid title-only creation produces a pending task without observations or deadline; optional values, multiline observations, and past deadlines persist exactly as supplied.
+- [x] Creation time is sampled from the server clock after write access is acquired, and the task receives a server-generated UUID identity.
+- [x] A validation rejection stores its terminal result and creates no task.
+- [x] Success is reported only after the mutation and its result commit together.
+- [x] Integration tests carry the approved boundary fixtures through the command, including 200/201 title clusters, 5,000/5,001 observation clusters, whitespace-only titles, invalid calendar dates, combined-character cases, both accepted date endpoints, and rejected `9999-12-31`.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 20 tests pass in `tests/server/integration/test_services_create.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full

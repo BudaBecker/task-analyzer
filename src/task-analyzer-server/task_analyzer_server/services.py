@@ -1,7 +1,8 @@
 """Operation services for the Task Analyzer server.
 
-Covers PCE-29 through PCE-31, PCE-35 and PCE-37 through PCE-43
-(REQ-010, REQ-028, REQ-031).
+Covers PCE-01 through PCE-10, PCE-28 through PCE-31, PCE-35, PCE-37
+through PCE-43, PCE-48, PCE-51 and PCE-52 (REQ-007, REQ-008, REQ-010,
+REQ-028, REQ-031).
 
 One submitted attempt resolves once. The runner here turns a request
 plus a command into exactly one terminal result, and it does so in the
@@ -38,7 +39,8 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Callable
-from uuid import UUID
+from datetime import date, datetime
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from task_analyzer_server import storage
@@ -46,13 +48,23 @@ from task_analyzer_server.clock import Clock, product_date
 from task_analyzer_server.contracts import (
     ConfigurationView,
     ErrorCode,
+    OperationError,
     OperationRequest,
     OperationResult,
+    TaskInput,
+    TaskInputError,
+    TaskSnapshot,
+    ValidationIssue,
+    parse_task_input,
 )
+from task_analyzer_server.domain import title_key, validate_task
 from task_analyzer_server.settings import ServerSettings
 
 API_VERSION = "v1"
 CANONICAL_SEPARATOR = "|"
+
+CREATED_STATUS = 201
+VALIDATION_FAILED_STATUS = 422
 
 OperationCommand = Callable[
     [sqlite3.Connection, OperationRequest], OperationResult
@@ -175,6 +187,47 @@ def lookup_operation(
     return None if retained is None else retained.result
 
 
+def create_task(
+    settings: ServerSettings, clock: Clock, request: OperationRequest
+) -> OperationResult:
+    """Create one pending task from a submitted operation.
+
+    The attempt runs through the shared runner, so a repetition returns
+    the original outcome instead of creating a second task.
+
+    Args:
+        settings: Runtime configuration naming the database.
+        clock: The server's source of the current instant.
+        request: The submitted creation operation.
+
+    Returns:
+        The terminal result: the created task, or the rejection that
+        left every task untouched.
+
+    Raises:
+        ProtocolRefusalError: If the attempt is refused before any
+            outcome exists.
+        sqlite3.Error: If the database cannot serve or commit the
+            attempt.
+    """
+
+    def command(
+        connection: sqlite3.Connection, submitted: OperationRequest
+    ) -> OperationResult:
+        """Apply the creation inside the open write transaction.
+
+        Args:
+            connection: Connection holding the write transaction.
+            submitted: The submitted creation operation.
+
+        Returns:
+            The terminal result of the attempt.
+        """
+        return _apply_creation(connection, submitted, clock)
+
+    return apply_operation(settings, request, command)
+
+
 def configure_zone(
     settings: ServerSettings, clock: Clock, zone_key: str
 ) -> ConfigurationView:
@@ -262,6 +315,159 @@ def require_product_time_zone(connection: sqlite3.Connection) -> str:
     if zone_key is None:
         raise ProtocolRefusalError(ErrorCode.PRODUCT_TIME_ZONE_REQUIRED)
     return zone_key
+
+
+def _apply_creation(
+    connection: sqlite3.Connection,
+    request: OperationRequest,
+    clock: Clock,
+) -> OperationResult:
+    """Settle one creation attempt inside the write transaction.
+
+    The instant is sampled here, with write access already held, so the
+    recorded original creation time is the moment the task actually
+    became part of the collection.
+
+    Args:
+        connection: Connection holding the write transaction.
+        request: The submitted creation operation.
+        clock: The server's source of the current instant.
+
+    Returns:
+        The created task's success result, or a durable rejection that
+        creates nothing.
+
+    Raises:
+        ProtocolRefusalError: If no product time zone has been fixed.
+    """
+    require_product_time_zone(connection)
+    accepted = _accepted_input(request.payload)
+    if isinstance(accepted, tuple):
+        return _validation_rejection(request, clock, accepted)
+    now = clock.now()
+    stored = storage.insert_task(
+        connection,
+        task_id=uuid4(),
+        title=accepted.title,
+        title_key=title_key(accepted.title),
+        observations=accepted.observations,
+        deadline=_accepted_deadline(accepted.deadline),
+        created_at=now,
+    )
+    return _success(request, now, CREATED_STATUS, stored)
+
+
+def _accepted_input(
+    payload: object,
+) -> TaskInput | tuple[ValidationIssue, ...]:
+    """Apply both parsing and the business rules to a payload.
+
+    Args:
+        payload: Parsed JSON payload of the submitted operation.
+
+    Returns:
+        The accepted input, or the issues that rejected it. The issues
+        are never empty, so the two are told apart by type alone.
+    """
+    try:
+        data = parse_task_input(payload)
+    except TaskInputError as failure:
+        return failure.issues
+    issues = validate_task(data)
+    return issues if issues else data
+
+
+def _accepted_deadline(deadline: str | None) -> date | None:
+    """Read an already accepted deadline as a calendar date.
+
+    Validation has settled the spelling and the supported range before
+    this runs, so this is only the conversion of accepted text, never a
+    second calendar rule.
+
+    Args:
+        deadline: Accepted deadline text, or ``None`` when absent.
+
+    Returns:
+        The calendar date, or ``None`` for an undated task.
+    """
+    return None if deadline is None else date.fromisoformat(deadline)
+
+
+def _validation_rejection(
+    request: OperationRequest,
+    clock: Clock,
+    issues: tuple[ValidationIssue, ...],
+) -> OperationResult:
+    """Build the durable rejection of an invalid submission.
+
+    Args:
+        request: The submitted operation.
+        clock: The server's source of the current instant.
+        issues: The rejected fields and their stable codes.
+
+    Returns:
+        The rejection result, which changes no task.
+    """
+    return _rejection(
+        request,
+        clock.now(),
+        VALIDATION_FAILED_STATUS,
+        OperationError(code=ErrorCode.TASK_VALIDATION_FAILED, fields=issues),
+    )
+
+
+def _success(
+    request: OperationRequest,
+    resolved_at: datetime,
+    status: int,
+    task: TaskSnapshot,
+) -> OperationResult:
+    """Build the terminal result of an accepted operation.
+
+    Args:
+        request: The submitted operation.
+        resolved_at: When the server settled the outcome.
+        status: The status the original request answered with.
+        task: The task as it is now stored.
+
+    Returns:
+        The success result.
+    """
+    return OperationResult(
+        operation_id=request.operation_id,
+        outcome="succeeded",
+        original_http_status=status,
+        task=task,
+        error=None,
+        resolved_at=resolved_at,
+    )
+
+
+def _rejection(
+    request: OperationRequest,
+    resolved_at: datetime,
+    status: int,
+    error: OperationError,
+) -> OperationResult:
+    """Build the terminal result of a rejected operation.
+
+    Args:
+        request: The submitted operation.
+        resolved_at: When the server settled the outcome.
+        status: The status the original request answered with.
+        error: Why the operation was rejected.
+
+    Returns:
+        The rejection result.
+    """
+    return OperationResult(
+        operation_id=request.operation_id,
+        outcome="rejected",
+        original_http_status=status,
+        task=None,
+        error=error,
+        resolved_at=resolved_at,
+    )
 
 
 def _confirm_known_zone(zone_key: str) -> None:
