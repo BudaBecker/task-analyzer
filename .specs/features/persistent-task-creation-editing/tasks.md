@@ -401,7 +401,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T9: Implement the server clock and product date
+### T9: Implement the server clock and product date [Complete]
 
 **What**: Add the `Clock` protocol and its default implementation supplying aware UTC instants, the product date, and microsecond conversions.
 **Where**: `src/task-analyzer-server/task_analyzer_server/clock.py`
@@ -416,12 +416,12 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] `now()` returns an aware UTC `datetime`; conversion to and from integer UTC microseconds uses integer and timedelta arithmetic, never floating-point epoch rounding.
-- [ ] The product date derives from server time converted into the retained IANA product zone.
-- [ ] The clock is substitutable so tests supply a controlled instant; no other service dependency needs substitution.
-- [ ] Unit tests assert that a changed host display zone does not alter the product date derived from the configured zone.
-- [ ] Gate check passes: `python -m pytest tests/server/unit`.
-- [ ] Test count: at least 10 tests pass in `tests/server/unit/test_clock.py` (no silent deletions).
+- [x] `now()` returns an aware UTC `datetime`; conversion to and from integer UTC microseconds uses integer and timedelta arithmetic, never floating-point epoch rounding.
+- [x] The product date derives from server time converted into the retained IANA product zone.
+- [x] The clock is substitutable so tests supply a controlled instant; no other service dependency needs substitution.
+- [x] Unit tests assert that a changed host display zone does not alter the product date derived from the configured zone.
+- [x] Gate check passes: `python -m pytest tests/server/unit`.
+- [x] Test count: at least 10 tests pass in `tests/server/unit/test_clock.py` (no silent deletions).
 
 **Tests**: unit
 **Gate**: quick
