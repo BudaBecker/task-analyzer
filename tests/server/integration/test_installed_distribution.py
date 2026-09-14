@@ -16,6 +16,7 @@ installs anything into the checkout, or touches systemd, Tailscale or a
 real host.
 """
 
+import json
 import os
 import socket
 import subprocess
@@ -574,6 +575,9 @@ def test_startup_with_an_absent_database_fails_without_creating_it(
     )
 
     assert completed.returncode != 0
-    assert "StartupVerificationError" in completed.stderr
-    assert str(absent) in completed.stderr
+    events = "\n".join(
+        json.loads(line)["event"] for line in completed.stderr.splitlines()
+    )
+    assert "StartupVerificationError" in events
+    assert str(absent) in events
     assert not absent.exists()

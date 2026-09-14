@@ -12,7 +12,7 @@ The original implementation and audit are preserved in Git at `8c68d6a`. Histori
 
 - [x] Simplify project instructions and document the approved process/tooling change.
 - [x] Establish uv, a persistent ignored .venv and repeatable setup/build commands.
-- [ ] Fix initialization ownership, blocking routes, JSON number handling, read consistency and runtime logging, with regressions.
+- [x] Fix initialization ownership, blocking routes, JSON number handling, read consistency and runtime logging, with regressions.
 - [ ] Consolidate explanatory text and shared test setup while preserving scenarios.
 - [ ] Refresh feature/product documentation, run full checks and report measured results.
 

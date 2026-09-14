@@ -32,11 +32,14 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import sqlite3
+from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, FastAPI, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from task_analyzer_server import services
@@ -148,8 +151,11 @@ async def configure_product_time_zone(request: Request) -> Response:
     """
     zone_key = _submitted_zone_key(await request.body())
     return published(
-        services.configure_zone(
-            _settings_of(request), _clock_of(request), zone_key
+        await run_in_threadpool(
+            services.configure_zone,
+            _settings_of(request),
+            _clock_of(request),
+            zone_key,
         ),
         OK_STATUS,
     )
@@ -180,8 +186,11 @@ async def create_task(request: Request) -> Response:
     submitted = await _submitted_operation(request)
     return _resolved(
         request,
-        services.create_task(
-            _settings_of(request), _clock_of(request), submitted
+        await run_in_threadpool(
+            services.create_task,
+            _settings_of(request),
+            _clock_of(request),
+            submitted,
         ),
         timer,
     )
@@ -214,8 +223,12 @@ async def edit_task(request: Request, task_id: str) -> Response:
     target = _usable_identity(task_id)
     return _resolved(
         request,
-        services.edit_task(
-            _settings_of(request), _clock_of(request), submitted, target
+        await run_in_threadpool(
+            services.edit_task,
+            _settings_of(request),
+            _clock_of(request),
+            submitted,
+            target,
         ),
         timer,
     )
@@ -368,7 +381,9 @@ async def _submitted_operation(request: Request) -> OperationRequest:
     )
     body = await request.body()
     try:
-        payload = json.loads(body)
+        payload = json.loads(
+            body, parse_float=_json_number, parse_constant=_invalid_constant
+        )
     except ValueError:
         raise services.ProtocolRefusalError(
             ErrorCode.INVALID_OPERATION_ENVELOPE
@@ -379,6 +394,16 @@ async def _submitted_operation(request: Request) -> OperationRequest:
         target=request.url.path,
         payload=payload,
     )
+
+
+def _invalid_constant(value: str) -> None:
+    raise ValueError(f"Not a JSON number: {value}")
+
+
+def _json_number(value: str) -> float | Decimal:
+    # Preserve large valid numbers until strict field validation rejects them.
+    number = float(value)
+    return number if math.isfinite(number) else Decimal(value)
 
 
 def _resolved(

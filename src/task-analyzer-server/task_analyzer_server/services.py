@@ -40,6 +40,7 @@ import json
 import sqlite3
 from collections.abc import Callable
 from datetime import date, datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -390,6 +391,7 @@ def read_task_list(settings: ServerSettings, clock: Clock) -> TaskListView:
     with storage.open_connection(
         settings.database_path, settings.db_busy_timeout_ms
     ) as connection:
+        connection.execute("BEGIN")
         zone_key = storage.read_product_time_zone(connection)
         tasks = storage.read_tasks(connection)
     now = clock.now()
@@ -797,6 +799,23 @@ def _canonical_payload(payload: object) -> str:
         ValueError: If the payload holds a number JSON cannot carry.
         TypeError: If the payload holds a value that is not parsed JSON.
     """
+    if isinstance(payload, Decimal):
+        if not payload.is_finite():
+            raise ValueError("Not a finite JSON number")
+        return str(payload)
+    if isinstance(payload, dict):
+        return (
+            "{"
+            + ",".join(
+                json.dumps(key, ensure_ascii=False)
+                + ":"
+                + _canonical_payload(value)
+                for key, value in sorted(payload.items())
+            )
+            + "}"
+        )
+    if isinstance(payload, list):
+        return "[" + ",".join(map(_canonical_payload, payload)) + "]"
     return json.dumps(
         payload,
         sort_keys=True,

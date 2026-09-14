@@ -99,6 +99,19 @@ def configure_logging(level: str) -> None:
     root.addHandler(handler)
     root.setLevel(level)
 
+    # Uvicorn installs non-propagating handlers before calling the factory.
+    runtime_handler = logging.StreamHandler(stream=sys.stderr)
+    runtime_handler.setFormatter(JsonLineFormatter())
+    runtime = logging.getLogger("uvicorn")
+    runtime.handlers = [runtime_handler]
+    runtime.setLevel(level)
+    runtime.propagate = False
+    for name in ("uvicorn.error", "uvicorn.access"):
+        logger = logging.getLogger(name)
+        logger.handlers.clear()
+        logger.setLevel(level)
+        logger.propagate = True
+
 
 def _build_payload(record: logging.LogRecord) -> dict[str, Any]:
     """Collect the approved fields of one record.

@@ -51,12 +51,16 @@ def initialize_database(path: Path) -> None:
             overwritten.
         sqlite3.Error: If the database cannot be created at that path.
     """
-    if path.exists():
+    script = read_initial_schema()
+    try:
+        # Only the exclusive creator owns failure cleanup for this path.
+        with path.open("xb"):
+            pass
+    except FileExistsError:
         raise DatabaseAlreadyExistsError(
             f"{path} already exists; initialization never recreates,"
             " migrates, or overwrites an existing database."
-        )
-    script = read_initial_schema()
+        ) from None
     try:
         with closing(
             sqlite3.connect(path, isolation_level=None)
