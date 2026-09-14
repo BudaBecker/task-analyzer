@@ -780,17 +780,17 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] `create_app(settings, clock)` composes real services, the operation-lookup router and handlers. `api.py` never imports `app.py`; future routes register in that same router without a deferred composition fix.
-- [ ] `application_factory() -> FastAPI` constructs settings from the approved environment and the default clock, then calls `create_app`. The Uvicorn entry is `task_analyzer_server.app:application_factory --factory`; it accepts no arguments and never initializes a database.
-- [ ] Startup opens the configured database in existing-file mode and verifies schema version, PRAGMAs and readable configuration. Missing/incompatible databases fail visibly; an initialized database with no zone starts successfully.
-- [ ] Runtime and time-data versions are logged. No product sign-in, accounts or forwarded-identity handling is introduced.
-- [ ] `GET /v1/operations/{operation_id}` returns 200 for either stored terminal outcome, preserving original status inside the result, or `404 OPERATION_RESULT_UNKNOWN` for no committed result. Unknown never implies rejection or rollback.
-- [ ] Shared handlers map `400 INVALID_OPERATION_ENVELOPE`, `409 OPERATION_ID_REUSED`, `409 PRODUCT_TIME_ZONE_REQUIRED`, `503 STORAGE_UNAVAILABLE` and `500 INTERNAL_ERROR` to the exact ProtocolError contract. Nonempty request IDs correlate response errors and logs; errors never expose input or invent terminal outcomes.
-- [ ] Envelope parsing and task validation remain distinct: malformed JSON/unusable operation IDs are protocol errors; invalid task fields with a valid envelope enter the durable validation flow. Replays resolve before new-attempt validation.
-- [ ] HTTPX tests run the composed application's lifespan with disposable databases. Cover startup success/failures, the default factory, stored success/rejection lookup, unknown lookup, invalid lookup ID and infrastructure errors. Handler-only cases use test-local routes registered on this composed application, never production placeholders.
-- [ ] Responses carry `Cache-Control: no-store`. Assert exact error field sets, including omission of unusable operation IDs and matching request IDs in logs.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 26 tests pass across `tests/server/integration/test_api_app.py` and `tests/server/integration/test_api_operations.py` (no silent deletions).
+- [x] `create_app(settings, clock)` composes real services, the operation-lookup router and handlers. `api.py` never imports `app.py`; future routes register in that same router without a deferred composition fix.
+- [x] `application_factory() -> FastAPI` constructs settings from the approved environment and the default clock, then calls `create_app`. The Uvicorn entry is `task_analyzer_server.app:application_factory --factory`; it accepts no arguments and never initializes a database.
+- [x] Startup opens the configured database in existing-file mode and verifies schema version, PRAGMAs and readable configuration. Missing/incompatible databases fail visibly; an initialized database with no zone starts successfully.
+- [x] Runtime and time-data versions are logged. No product sign-in, accounts or forwarded-identity handling is introduced.
+- [x] `GET /v1/operations/{operation_id}` returns 200 for either stored terminal outcome, preserving original status inside the result, or `404 OPERATION_RESULT_UNKNOWN` for no committed result. Unknown never implies rejection or rollback.
+- [x] Shared handlers map `400 INVALID_OPERATION_ENVELOPE`, `409 OPERATION_ID_REUSED`, `409 PRODUCT_TIME_ZONE_REQUIRED`, `503 STORAGE_UNAVAILABLE` and `500 INTERNAL_ERROR` to the exact ProtocolError contract. Nonempty request IDs correlate response errors and logs; errors never expose input or invent terminal outcomes.
+- [x] Envelope parsing and task validation remain distinct: malformed JSON/unusable operation IDs are protocol errors; invalid task fields with a valid envelope enter the durable validation flow. Replays resolve before new-attempt validation.
+- [x] HTTPX tests run the composed application's lifespan with disposable databases. Cover startup success/failures, the default factory, stored success/rejection lookup, unknown lookup, invalid lookup ID and infrastructure errors. Handler-only cases use test-local routes registered on this composed application, never production placeholders.
+- [x] Responses carry `Cache-Control: no-store`. Assert exact error field sets, including omission of unusable operation IDs and matching request IDs in logs.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 26 tests pass across `tests/server/integration/test_api_app.py` and `tests/server/integration/test_api_operations.py` (no silent deletions).
 
 **Tests**: e2e
 **Gate**: full
