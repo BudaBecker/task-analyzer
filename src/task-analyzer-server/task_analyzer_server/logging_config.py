@@ -1,18 +1,6 @@
 """JSON-line structured logging for the Task Analyzer server.
 
-Covers PCE-44 (REQ-003). Records are emitted through the standard
-``logging`` module as one JSON object per line, carrying the approved
-field list and nothing else.
-
-The formatter works from an allow list. Any other attribute a caller
-attaches to a record is dropped, so task titles, observations, request
-bodies, canonical request text and secrets cannot reach the log even by
-accident. The log message itself is the event name: keep it a stable
-identifier, never user content.
-
-Formatting never raises into the caller. A record that cannot be
-serialized is replaced by a minimal failure record, because log
-formatting must not decide whether a transaction commits.
+Covers PCE-44 (REQ-003).
 """
 
 from __future__ import annotations
@@ -39,22 +27,14 @@ FORMAT_FAILURE_EVENT = "log_record_not_serializable"
 
 
 class DurationTimer:
-    """Measure elapsed time with the monotonic clock.
-
-    Wall-clock time can jump backwards when the host clock is corrected.
-    Durations therefore come from ``time.monotonic`` only.
-    """
+    """Measure elapsed time with the monotonic clock."""
 
     def __init__(self) -> None:
         """Start the measurement."""
         self._started_at = time.monotonic()
 
     def elapsed_ms(self) -> int:
-        """Return the whole milliseconds elapsed since construction.
-
-        Returns:
-            The elapsed monotonic duration, rounded to milliseconds.
-        """
+        """Return the whole milliseconds elapsed since construction."""
         elapsed_seconds = time.monotonic() - self._started_at
         return round(elapsed_seconds * 1000)
 
@@ -63,14 +43,7 @@ class JsonLineFormatter(logging.Formatter):
     """Render a logging record as a single-line JSON object."""
 
     def format(self, record: logging.LogRecord) -> str:
-        """Render one record.
-
-        Args:
-            record: The record to render.
-
-        Returns:
-            One JSON object with the approved fields, without newlines.
-        """
+        """Render one record."""
         try:
             payload = _build_payload(record)
             return json.dumps(payload)
@@ -81,15 +54,7 @@ class JsonLineFormatter(logging.Formatter):
 
 
 def configure_logging(level: str) -> None:
-    """Install JSON-line logging on the root logger.
-
-    Replaces any previously installed root handlers so records are not
-    emitted twice in a different format.
-
-    Args:
-        level: Standard logging level name, already validated by
-            ``ServerSettings``.
-    """
+    """Install JSON-line logging on the root logger."""
     handler = logging.StreamHandler(stream=sys.stdout)
     handler.setFormatter(JsonLineFormatter())
 
@@ -114,19 +79,7 @@ def configure_logging(level: str) -> None:
 
 
 def _build_payload(record: logging.LogRecord) -> dict[str, Any]:
-    """Collect the approved fields of one record.
-
-    Args:
-        record: The record to read.
-
-    Returns:
-        A mapping holding the required fields plus any supplied optional
-        identifier.
-
-    Raises:
-        Exception: If a supplied value cannot be coerced to its field
-            type. The caller turns that into a failure record.
-    """
+    """Collect the approved fields of one record."""
     payload: dict[str, Any] = {
         "timestamp": _format_timestamp(record.created),
         "level": record.levelname,
@@ -146,14 +99,7 @@ def _build_payload(record: logging.LogRecord) -> dict[str, Any]:
 
 
 def _failure_payload(record: logging.LogRecord) -> dict[str, Any]:
-    """Build the minimal record used when formatting failed.
-
-    Args:
-        record: The record that could not be rendered.
-
-    Returns:
-        A mapping with the required fields only, naming the failure.
-    """
+    """Build the minimal record used when formatting failed."""
     return {
         "timestamp": _format_timestamp(getattr(record, "created", 0.0)),
         "level": str(getattr(record, "levelname", "ERROR")),
@@ -166,45 +112,20 @@ def _failure_payload(record: logging.LogRecord) -> dict[str, Any]:
 
 
 def _format_timestamp(created: float) -> str:
-    """Render a record's creation time as a UTC instant.
-
-    Args:
-        created: Seconds since the epoch, as recorded by ``logging``.
-
-    Returns:
-        An ISO-8601 UTC instant with six fractional digits and a ``Z``
-        suffix.
-    """
+    """Render a record's creation time as a UTC instant."""
     moment = datetime.fromtimestamp(created, tz=UTC)
     return moment.strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z"
 
 
 def _optional_text(value: object) -> str | None:
-    """Coerce an optional identifier or code to text.
-
-    Args:
-        value: The supplied value, or None when the field is unknown.
-
-    Returns:
-        The value as text, or None.
-    """
+    """Coerce an optional identifier or code to text."""
     if value is None:
         return None
     return str(value)
 
 
 def _optional_duration(value: object) -> int | None:
-    """Coerce an optional duration to whole milliseconds.
-
-    Args:
-        value: The supplied duration, or None when not measured.
-
-    Returns:
-        The duration in whole milliseconds, or None.
-
-    Raises:
-        TypeError: If the value is not a number.
-    """
+    """Coerce an optional duration to whole milliseconds."""
     if value is None:
         return None
     if isinstance(value, bool) or not isinstance(value, (int, float)):

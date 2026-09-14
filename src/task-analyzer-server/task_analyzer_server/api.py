@@ -1,31 +1,7 @@
 """HTTP boundary of the Task Analyzer server.
 
-Covers PCE-26, PCE-38, PCE-40 through PCE-43, PCE-46 and PCE-47
-(REQ-010, REQ-027, REQ-029, REQ-031).
-
-A route reads the operation envelope, calls a service and publishes the
-result. No business rule lives here, and no route mutates a task.
-
-Two failure kinds are deliberately kept apart. A request whose envelope
-cannot be read at all, such as an operation identity that is not a
-usable UUID, never reaches the operation flow: nothing about it is
-retained and the answer is a protocol error. A request carrying a usable
-envelope enters the flow even when its task fields are wrong, so that
-rejection is retained and stays consultable afterwards.
-
-A protocol error carries a server-generated request identity and no
-terminal outcome, so it can never be read as evidence that an operation
-was applied, rejected, cancelled or rolled back. The same identity is
-written to the log record describing the failure, which is what
-correlates a reported error with the server's own account of it. The
-error never carries submitted input.
-
-Every response is served with ``Cache-Control: no-store``: the desktop
-reads current server state, never a cached copy of it.
-
-There is no product sign-in anywhere in this module. No route reads a
-credential and no forwarded identity header is treated as a product
-account, so nothing here turns the personal collection into an account.
+Covers PCE-26, PCE-38, PCE-40 through PCE-43, PCE-46 and PCE-47 (REQ-010,
+REQ-027, REQ-029, REQ-031).
 """
 
 from __future__ import annotations
@@ -87,28 +63,14 @@ REFUSAL_STATUS: dict[ErrorCode, int] = {
     ErrorCode.PRODUCT_TIME_ZONE_FIXED: CONFLICT_STATUS,
     ErrorCode.INVALID_TIME_ZONE: UNPROCESSABLE_STATUS,
 }
-"""The status each refusal answers with, decided in one place.
-
-Every route raises the refusal and none of them chooses a status, so one
-code always reaches the desktop as the same status.
-"""
 
 router = APIRouter(prefix=API_PREFIX)
-"""Every route of the server.
-
-Routes added by later deliveries register here, so composition never has
-to be revisited to publish them.
-"""
 
 _logger = logging.getLogger(__name__)
 
 
 def install_error_handlers(app: FastAPI) -> None:
-    """Install the shared failure handlers on a composed application.
-
-    Args:
-        app: The application the handlers answer for.
-    """
+    """Install the shared failure handlers on a composed application."""
     app.add_exception_handler(services.ProtocolRefusalError, _handle_refusal)
     app.add_exception_handler(sqlite3.Error, _handle_storage_failure)
     app.add_exception_handler(Exception, _handle_unexpected)
@@ -116,14 +78,7 @@ def install_error_handlers(app: FastAPI) -> None:
 
 @router.get("/configuration")
 def read_configuration(request: Request) -> Response:
-    """Publish the product configuration as it currently stands.
-
-    Args:
-        request: The submitted HTTP request.
-
-    Returns:
-        The configuration at one sampled server instant.
-    """
+    """Publish the product configuration as it currently stands."""
     return published(
         services.read_configuration(_settings_of(request), _clock_of(request)),
         OK_STATUS,
@@ -132,23 +87,7 @@ def read_configuration(request: Request) -> Response:
 
 @router.put("/configuration")
 async def configure_product_time_zone(request: Request) -> Response:
-    """Fix the product time zone, or confirm the one already fixed.
-
-    Setup is a compare-and-set on a singleton rather than a task
-    operation, so it carries no operation identity and the same key is
-    safe to send again. A different key never replaces a retained zone.
-
-    Args:
-        request: The submitted HTTP request.
-
-    Returns:
-        The configuration as it stands once the attempt finished.
-
-    Raises:
-        ProtocolRefusalError: ``INVALID_TIME_ZONE`` if no usable zone
-            key was submitted, or ``PRODUCT_TIME_ZONE_FIXED`` if
-            another key is already retained.
-    """
+    """Fix the product time zone, or confirm the one already fixed."""
     zone_key = _submitted_zone_key(await request.body())
     return published(
         await run_in_threadpool(
@@ -163,25 +102,7 @@ async def configure_product_time_zone(request: Request) -> Response:
 
 @router.post("/tasks")
 async def create_task(request: Request) -> Response:
-    """Create one pending task from a submitted operation.
-
-    The envelope is read first, so a request the server cannot identify
-    never reaches the operation flow. Once the envelope is usable, the
-    task fields are validated inside that flow, which is what keeps a
-    rejected submission consultable afterwards.
-
-    Args:
-        request: The submitted HTTP request.
-
-    Returns:
-        The terminal result of the attempt, answered with the status
-        that attempt was originally settled with.
-
-    Raises:
-        ProtocolRefusalError: If the envelope is unusable, the identity
-            was already resolved for different content, or no product
-            time zone has been fixed.
-    """
+    """Create one pending task from a submitted operation."""
     timer = DurationTimer()
     submitted = await _submitted_operation(request)
     return _resolved(
@@ -198,26 +119,7 @@ async def create_task(request: Request) -> Response:
 
 @router.put("/tasks/{task_id}")
 async def edit_task(request: Request, task_id: str) -> Response:
-    """Replace the editable state of one pending task.
-
-    The whole editable form arrives at once, so an omitted optional
-    value and an explicit ``null`` both mean the value is absent
-    afterwards. Identity, original creation time and status belong to
-    the server and no edit moves them.
-
-    Args:
-        request: The submitted HTTP request.
-        task_id: Identity of the task the request targets.
-
-    Returns:
-        The terminal result of the attempt, answered with the status
-        that attempt was originally settled with.
-
-    Raises:
-        ProtocolRefusalError: If the envelope is unusable, the identity
-            was already resolved for different content, or no product
-            time zone has been fixed.
-    """
+    """Replace the editable state of one pending task."""
     timer = DurationTimer()
     submitted = await _submitted_operation(request)
     target = _usable_identity(task_id)
@@ -236,18 +138,7 @@ async def edit_task(request: Request, task_id: str) -> Response:
 
 @router.get("/tasks")
 def read_tasks(request: Request) -> Response:
-    """Publish every managed task with the context of one reading.
-
-    The reading carries no sorting, filtering, pagination, emphasis or
-    metric: those are presentation and analysis concerns, not this
-    route's.
-
-    Args:
-        request: The submitted HTTP request.
-
-    Returns:
-        The managed tasks and the time context of this reading.
-    """
+    """Publish every managed task with the context of one reading."""
     return published(
         services.read_task_list(_settings_of(request), _clock_of(request)),
         OK_STATUS,
@@ -256,27 +147,7 @@ def read_tasks(request: Request) -> Response:
 
 @router.get("/operations/{operation_id}")
 def read_operation_result(request: Request, operation_id: str) -> Response:
-    """Consult the outcome one operation established.
-
-    The transport status of a consultation is not the operation's
-    outcome. Either terminal outcome is published with ``200``, because
-    the question asked here is answered: the server knows what that
-    operation did. Consumers read ``outcome`` and must never read this
-    ``200`` as evidence that a task was persisted.
-
-    Args:
-        request: The submitted HTTP request.
-        operation_id: The original operation identity, as submitted.
-
-    Returns:
-        The retained terminal result.
-
-    Raises:
-        ProtocolRefusalError: ``INVALID_OPERATION_ENVELOPE`` if the
-            identity is not usable, or ``OPERATION_RESULT_UNKNOWN`` if
-            no committed result carries it. Unknown is not a rejection,
-            a cancellation or a rollback.
-    """
+    """Consult the outcome one operation established."""
     identity = usable_operation_id(request, operation_id)
     retained = services.lookup_operation(_settings_of(request), identity)
     if retained is None:
@@ -285,19 +156,7 @@ def read_operation_result(request: Request, operation_id: str) -> Response:
 
 
 def published(model: BaseModel, status: int) -> Response:
-    """Publish one contract model as this server's JSON response.
-
-    The model serializes itself, so the approved wire spelling of
-    instants, dates and identities is the one that reaches the desktop
-    rather than a framework's rendering of the same values.
-
-    Args:
-        model: The contract model to publish.
-        status: The HTTP status to answer with.
-
-    Returns:
-        The response, marked uncacheable.
-    """
+    """Publish one contract model as this server's JSON response."""
     return Response(
         content=model.model_dump_json(),
         status_code=status,
@@ -307,47 +166,14 @@ def published(model: BaseModel, status: int) -> Response:
 
 
 def usable_operation_id(request: Request, submitted: str) -> UUID:
-    """Read a submitted operation identity, or refuse the envelope.
-
-    A usable identity is remembered for this request, so a later failure
-    can name the operation the desktop should consult. An unusable one
-    is remembered nowhere, so the answer cannot suggest that an
-    operation exists.
-
-    Args:
-        request: The submitted HTTP request.
-        submitted: The identity text as submitted.
-
-    Returns:
-        The submitted identity.
-
-    Raises:
-        ProtocolRefusalError: ``INVALID_OPERATION_ENVELOPE`` if the text
-            is not a usable UUID.
-    """
+    """Read a submitted operation identity, or refuse the envelope."""
     identity = _usable_identity(submitted)
     _request_state(request)[OPERATION_ID_KEY] = identity
     return identity
 
 
 def _usable_identity(submitted: str) -> UUID:
-    """Read one submitted envelope identity.
-
-    Both the operation and the task target are named by identities the
-    server must be able to read before any work starts. Text that is not
-    one names nothing, so the request never reaches the operation flow
-    and nothing about it is retained.
-
-    Args:
-        submitted: The identity text as submitted.
-
-    Returns:
-        The submitted identity.
-
-    Raises:
-        ProtocolRefusalError: ``INVALID_OPERATION_ENVELOPE`` if the text
-            is not a usable UUID.
-    """
+    """Read one submitted envelope identity."""
     try:
         return UUID(submitted.strip())
     except ValueError:
@@ -357,25 +183,7 @@ def _usable_identity(submitted: str) -> UUID:
 
 
 async def _submitted_operation(request: Request) -> OperationRequest:
-    """Read the operation envelope one task command submitted.
-
-    The identity, the method and the target come from the request
-    itself, and the payload is the JSON it carried, parsed but not yet
-    judged. Whether those task fields are acceptable is the operation
-    flow's decision, not this one's, so an invalid submission still
-    reaches the flow and still gets a retained answer.
-
-    Args:
-        request: The submitted HTTP request.
-
-    Returns:
-        The submitted operation and its envelope values.
-
-    Raises:
-        ProtocolRefusalError: ``INVALID_OPERATION_ENVELOPE`` if no
-            usable operation identity was supplied or the body is not
-            JSON at all.
-    """
+    """Read the operation envelope one task command submitted."""
     identity = usable_operation_id(
         request, request.headers.get(OPERATION_ID_HEADER, "")
     )
@@ -409,22 +217,7 @@ def _json_number(value: str) -> float | Decimal:
 def _resolved(
     request: Request, result: OperationResult, timer: DurationTimer
 ) -> Response:
-    """Publish and record the terminal result of one attempt.
-
-    The result is already committed when this runs, so the recorded
-    success event never describes work that was not persisted. The
-    status is the one the attempt was originally settled with, which is
-    what makes a repetition answer exactly like the original request.
-
-    Args:
-        request: The submitted HTTP request.
-        result: The terminal result of the attempt.
-        timer: The monotonic measurement started when the request
-            arrived.
-
-    Returns:
-        The published result.
-    """
+    """Publish and record the terminal result of one attempt."""
     _logger.info(
         OPERATION_RESOLVED_EVENT,
         extra={
@@ -444,23 +237,7 @@ def _resolved(
 
 
 def _submitted_zone_key(body: bytes) -> str:
-    """Read the zone key a setup request submitted.
-
-    Setup takes exactly one field, so a body that cannot be read, is not
-    an object, carries another field, or holds anything but text leaves
-    the server with no usable zone key. That is the same answer an
-    unknown key gets: the submitted zone is not one the server can fix.
-
-    Args:
-        body: The submitted request body.
-
-    Returns:
-        The submitted zone key, unvalidated.
-
-    Raises:
-        ProtocolRefusalError: ``INVALID_TIME_ZONE`` if no usable zone
-            key was submitted.
-    """
+    """Read the zone key a setup request submitted."""
     try:
         payload = json.loads(body)
     except ValueError:
@@ -478,15 +255,7 @@ def _submitted_zone_key(body: bytes) -> str:
 
 
 def _handle_refusal(request: Request, exception: Exception) -> Response:
-    """Answer a refusal that established no terminal outcome.
-
-    Args:
-        request: The refused HTTP request.
-        exception: The refusal raised by a route or a service.
-
-    Returns:
-        The protocol error for that refusal.
-    """
+    """Answer a refusal that established no terminal outcome."""
     refusal = cast(services.ProtocolRefusalError, exception)
     return _protocol_error(request, refusal.code, REFUSAL_STATUS[refusal.code])
 
@@ -494,19 +263,7 @@ def _handle_refusal(request: Request, exception: Exception) -> Response:
 def _handle_storage_failure(
     request: Request, exception: Exception
 ) -> Response:
-    """Answer a storage failure without inventing an outcome.
-
-    A lock wait, an I/O failure or a failed commit leaves the server
-    unable to say what happened, so it says exactly that. The desktop
-    consults the original operation identity instead.
-
-    Args:
-        request: The failed HTTP request.
-        exception: The storage failure.
-
-    Returns:
-        The protocol error for that failure.
-    """
+    """Answer a storage failure without inventing an outcome."""
     return _protocol_error(
         request,
         ErrorCode.STORAGE_UNAVAILABLE,
@@ -515,18 +272,7 @@ def _handle_storage_failure(
 
 
 def _handle_unexpected(request: Request, exception: Exception) -> Response:
-    """Answer an unexpected defect without inventing an outcome.
-
-    The connection helper has already rolled back and closed any
-    transaction still open, so no partial work survives this answer.
-
-    Args:
-        request: The failed HTTP request.
-        exception: The unexpected failure.
-
-    Returns:
-        The protocol error for that failure.
-    """
+    """Answer an unexpected defect without inventing an outcome."""
     return _protocol_error(
         request, ErrorCode.INTERNAL_ERROR, INTERNAL_ERROR_STATUS
     )
@@ -535,20 +281,7 @@ def _handle_unexpected(request: Request, exception: Exception) -> Response:
 def _protocol_error(
     request: Request, code: ErrorCode, status: int
 ) -> Response:
-    """Build and record one protocol error.
-
-    The response and the log record carry the same request identity, so
-    a reported failure can be found in the server's own account of it.
-    Neither carries submitted input.
-
-    Args:
-        request: The failed HTTP request.
-        code: The stable code naming the failure.
-        status: The HTTP status to answer with.
-
-    Returns:
-        The protocol error response.
-    """
+    """Build and record one protocol error."""
     state = _request_state(request)
     operation_id = state.get(OPERATION_ID_KEY)
     error = ProtocolError(
@@ -571,15 +304,7 @@ def _protocol_error(
 
 
 def _request_id(request: Request) -> UUID:
-    """Name this HTTP request, once.
-
-    Args:
-        request: The HTTP request to name.
-
-    Returns:
-        The identity of this request, generated on first use and stable
-        for the rest of it.
-    """
+    """Name this HTTP request, once."""
     state = _request_state(request)
     existing = state.get(REQUEST_ID_KEY)
     if isinstance(existing, UUID):
@@ -590,36 +315,15 @@ def _request_id(request: Request) -> UUID:
 
 
 def _request_state(request: Request) -> dict[str, Any]:
-    """Reach the values remembered for one HTTP request.
-
-    Args:
-        request: The HTTP request.
-
-    Returns:
-        The mutable mapping shared by every layer of that request.
-    """
+    """Reach the values remembered for one HTTP request."""
     return cast(dict[str, Any], request.scope.setdefault("state", {}))
 
 
 def _settings_of(request: Request) -> ServerSettings:
-    """Reach the runtime settings the application was composed with.
-
-    Args:
-        request: The HTTP request being served.
-
-    Returns:
-        The settings of this application.
-    """
+    """Reach the runtime settings the application was composed with."""
     return cast(ServerSettings, request.app.state.settings)
 
 
 def _clock_of(request: Request) -> Clock:
-    """Reach the clock the application was composed with.
-
-    Args:
-        request: The HTTP request being served.
-
-    Returns:
-        The server's source of the current instant.
-    """
+    """Reach the clock the application was composed with."""
     return cast(Clock, request.app.state.clock)
