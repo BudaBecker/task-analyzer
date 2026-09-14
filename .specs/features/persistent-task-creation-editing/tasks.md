@@ -253,7 +253,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T5: Add the versioned initial schema
+### T5: Add the versioned initial schema [Complete]
 
 **What**: Add the initial DDL creating `product_configuration`, `tasks`, `operation_results`, `schema_version`, and the two unique partial indexes.
 **Where**: `src/task-analyzer-server/task_analyzer_server/schema/001_initial.sql`
@@ -268,13 +268,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] Tables and columns match the design exactly, including UUID text keys, `title_key`, nullable observations and `deadline_date`, integer UTC-microsecond timestamps, `status` restricted to `pending`/`completed`, and `is_deleted` restricted to `0`/`1`.
-- [ ] The dated index is unique on `(title_key, deadline_date)` where `is_deleted=0 AND deadline_date IS NOT NULL`, irrespective of status; the undated index is unique on `title_key` where `is_deleted=0 AND deadline_date IS NULL AND status='pending'`.
-- [ ] `operation_results` stores the canonical request text, terminal outcome, original HTTP status, serialized result, and resolution timestamp, with no cascading task foreign key.
-- [ ] `schema_version` is a singleton distinct from product configuration.
-- [ ] Integration tests apply the DDL to a newly allocated temporary database file and assert each constraint by attempting the violating write: duplicate dated combination rejected, duplicate undated pending title rejected, completed undated duplicate allowed, deleted rows excluded, invalid `status` and `is_deleted` rejected.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 12 tests pass in `tests/server/integration/test_schema_sql.py` (no silent deletions).
+- [x] Tables and columns match the design exactly, including UUID text keys, `title_key`, nullable observations and `deadline_date`, integer UTC-microsecond timestamps, `status` restricted to `pending`/`completed`, and `is_deleted` restricted to `0`/`1`.
+- [x] The dated index is unique on `(title_key, deadline_date)` where `is_deleted=0 AND deadline_date IS NOT NULL`, irrespective of status; the undated index is unique on `title_key` where `is_deleted=0 AND deadline_date IS NULL AND status='pending'`.
+- [x] `operation_results` stores the canonical request text, terminal outcome, original HTTP status, serialized result, and resolution timestamp, with no cascading task foreign key.
+- [x] `schema_version` is a singleton distinct from product configuration.
+- [x] Integration tests apply the DDL to a newly allocated temporary database file and assert each constraint by attempting the violating write: duplicate dated combination rejected, duplicate undated pending title rejected, completed undated duplicate allowed, deleted rows excluded, invalid `status` and `is_deleted` rejected.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 12 tests pass in `tests/server/integration/test_schema_sql.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full
