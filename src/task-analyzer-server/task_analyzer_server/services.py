@@ -67,6 +67,7 @@ CREATED_STATUS = 201
 EDITED_STATUS = 200
 NOT_FOUND_STATUS = 404
 STATE_INCOMPATIBLE_STATUS = 409
+UNIQUENESS_CONFLICT_STATUS = 409
 VALIDATION_FAILED_STATUS = 422
 
 PENDING_STATUS = "pending"
@@ -396,16 +397,36 @@ def _apply_creation(
     accepted = _accepted_input(request.payload)
     if isinstance(accepted, tuple):
         return _validation_rejection(request, clock, accepted)
-    now = clock.now()
-    stored = storage.insert_task(
-        connection,
-        task_id=uuid4(),
-        title=accepted.title,
-        title_key=title_key(accepted.title),
-        observations=accepted.observations,
-        deadline=_accepted_deadline(accepted.deadline),
-        created_at=now,
+    key = title_key(accepted.title)
+    deadline = _accepted_deadline(accepted.deadline)
+    conflict = storage.find_conflicting_task(
+        connection, title_key=key, deadline=deadline
     )
+    if conflict is not None:
+        return _conflict_rejection(request, clock, conflict)
+    now = clock.now()
+    try:
+        stored = storage.insert_task(
+            connection,
+            task_id=uuid4(),
+            title=accepted.title,
+            title_key=key,
+            observations=accepted.observations,
+            deadline=deadline,
+            created_at=now,
+        )
+    except sqlite3.IntegrityError:
+        # The unique partial indexes back up the check above. A write
+        # that still reaches them is the conflict they describe, not an
+        # internal defect, and SQLite aborts only the offending
+        # statement, so this rejection still commits with its
+        # transaction. Any other broken constraint is re-raised.
+        collided = storage.find_conflicting_task(
+            connection, title_key=key, deadline=deadline
+        )
+        if collided is None:
+            raise
+        return _conflict_rejection(request, clock, collided)
     return _success(request, now, CREATED_STATUS, stored)
 
 
@@ -454,14 +475,37 @@ def _apply_edit(
             STATE_INCOMPATIBLE_STATUS,
             OperationError(code=ErrorCode.TASK_STATE_INCOMPATIBLE),
         )
-    stored = storage.update_task(
+    key = title_key(accepted.title)
+    deadline = _accepted_deadline(accepted.deadline)
+    conflict = storage.find_conflicting_task(
         connection,
-        task_id=task_id,
-        title=accepted.title,
-        title_key=title_key(accepted.title),
-        observations=accepted.observations,
-        deadline=_accepted_deadline(accepted.deadline),
+        title_key=key,
+        deadline=deadline,
+        excluded_task_id=task_id,
     )
+    if conflict is not None:
+        return _conflict_rejection(request, clock, conflict)
+    try:
+        stored = storage.update_task(
+            connection,
+            task_id=task_id,
+            title=accepted.title,
+            title_key=key,
+            observations=accepted.observations,
+            deadline=deadline,
+        )
+    except sqlite3.IntegrityError:
+        # The unique partial indexes back up the check above; see the
+        # matching note in the creation command.
+        collided = storage.find_conflicting_task(
+            connection,
+            title_key=key,
+            deadline=deadline,
+            excluded_task_id=task_id,
+        )
+        if collided is None:
+            raise
+        return _conflict_rejection(request, clock, collided)
     return _success(request, clock.now(), EDITED_STATUS, stored)
 
 
@@ -499,6 +543,31 @@ def _accepted_deadline(deadline: str | None) -> date | None:
         The calendar date, or ``None`` for an undated task.
     """
     return None if deadline is None else date.fromisoformat(deadline)
+
+
+def _conflict_rejection(
+    request: OperationRequest, clock: Clock, conflicting_task_id: UUID
+) -> OperationResult:
+    """Build the durable rejection of a uniqueness conflict.
+
+    Args:
+        request: The submitted operation.
+        clock: The server's source of the current instant.
+        conflicting_task_id: The task the attempt collided with.
+
+    Returns:
+        The rejection result, which leaves both the target task and the
+        conflicting task exactly as they were.
+    """
+    return _rejection(
+        request,
+        clock.now(),
+        UNIQUENESS_CONFLICT_STATUS,
+        OperationError(
+            code=ErrorCode.TASK_UNIQUENESS_CONFLICT,
+            conflicting_task_id=conflicting_task_id,
+        ),
+    )
 
 
 def _validation_rejection(

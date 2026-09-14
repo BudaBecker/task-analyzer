@@ -734,7 +734,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T21: Enforce uniqueness within both commands
+### T21: Enforce uniqueness within both commands [Complete]
 
 **What**: Add in-transaction uniqueness enforcement shared by creation and editing, including the conflict rejection payload.
 **Where**: `src/task-analyzer-server/task_analyzer_server/services.py` (modify)
@@ -749,14 +749,14 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] Both commands check for a conflicting row while holding the write transaction and exclude the edited task itself.
-- [ ] Dated conflicts compare against pending and completed tasks; undated conflicts compare against undated pending tasks only; deleted tasks are always excluded.
-- [ ] Equivalent titles with different deadline dates coexist, and an undated task coexists with a dated task.
-- [ ] A conflict is a stored rejection identifying the uniqueness conflict and the conflicting task identity, leaving both the target task and the conflicting task unchanged.
-- [ ] An index violation from a competing write is translated into the same stored uniqueness rejection rather than an internal error.
-- [ ] Integration tests use the protected examples and cover every comparison population named in the spec.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 24 tests pass in `tests/server/integration/test_services_uniqueness.py` (no silent deletions).
+- [x] Both commands check for a conflicting row while holding the write transaction and exclude the edited task itself.
+- [x] Dated conflicts compare against pending and completed tasks; undated conflicts compare against undated pending tasks only; deleted tasks are always excluded.
+- [x] Equivalent titles with different deadline dates coexist, and an undated task coexists with a dated task.
+- [x] A conflict is a stored rejection identifying the uniqueness conflict and the conflicting task identity, leaving both the target task and the conflicting task unchanged.
+- [x] An index violation from a competing write is translated into the same stored uniqueness rejection rather than an internal error.
+- [x] Integration tests use the protected examples and cover every comparison population named in the spec.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 24 tests pass in `tests/server/integration/test_services_uniqueness.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full
