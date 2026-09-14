@@ -1,6 +1,7 @@
 """SQLite access for the Task Analyzer server.
 
-Covers PCE-37 and PCE-43 (REQ-010, REQ-031).
+Covers PCE-11 through PCE-14, PCE-19 through PCE-25, PCE-29 and PCE-35
+through PCE-43 (REQ-008, REQ-010, REQ-028, REQ-029, REQ-031).
 
 This module owns every connection, statement, and transaction boundary.
 Callers receive an open connection for the duration of one synchronous
@@ -43,7 +44,7 @@ from task_analyzer_server.clock import (
     from_utc_microseconds,
     to_utc_microseconds,
 )
-from task_analyzer_server.contracts import TaskSnapshot
+from task_analyzer_server.contracts import OperationResult, TaskSnapshot
 
 BEGIN_IMMEDIATE = "BEGIN IMMEDIATE"
 COMMIT = "COMMIT"
@@ -105,6 +106,35 @@ FIND_UNDATED_CONFLICT = (
     " AND status = 'pending' AND title_key = ?"
     " AND task_id IS NOT ? LIMIT 1"
 )
+
+
+READ_OPERATION = (
+    "SELECT canonical_request, serialized_result FROM operation_results"
+    " WHERE operation_id = ?"
+)
+INSERT_OPERATION = (
+    "INSERT INTO operation_results ("
+    " operation_id, canonical_request, outcome, http_status,"
+    " serialized_result, resolved_at_us"
+    ") VALUES (?, ?, ?, ?, ?, ?)"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class StoredOperation:
+    """One retained terminal operation result and its request.
+
+    Attributes:
+        canonical_request: The canonical request text exactly as it was
+            stored, so a repeated attempt is compared against the text
+            itself rather than against a digest of it.
+        result: The terminal result as it was serialized when the
+            operation resolved. It is evidence of what happened then,
+            never a reading of current task state.
+    """
+
+    canonical_request: str
+    result: OperationResult
 
 
 class TaskNotStoredError(LookupError):
@@ -429,6 +459,72 @@ def find_conflicting_task(
             (_as_deadline_text(deadline), title_key, excluded),
         ).fetchone()
     return None if row is None else UUID(str(row[0]))
+
+
+def read_operation(
+    connection: sqlite3.Connection, operation_id: UUID
+) -> StoredOperation | None:
+    """Read the retained result of one operation.
+
+    Args:
+        connection: An open connection from :func:`open_connection`.
+        operation_id: Identity of the operation to consult.
+
+    Returns:
+        The retained result and its canonical request, or ``None`` when
+        no committed row carries that identity. ``None`` means the
+        outcome is unknown: it is not a rejection, a cancellation, or a
+        rollback, and callers must keep that difference.
+    """
+    row = connection.execute(READ_OPERATION, (str(operation_id),)).fetchone()
+    if row is None:
+        return None
+    return StoredOperation(
+        canonical_request=str(row[0]),
+        result=OperationResult.model_validate_json(str(row[1])),
+    )
+
+
+def write_operation(
+    connection: sqlite3.Connection,
+    *,
+    operation_id: UUID,
+    canonical_request: str,
+    result: OperationResult,
+) -> None:
+    """Retain the terminal result of one operation.
+
+    The row is written inside the caller's transaction, so a result and
+    the change it reports become durable together or not at all.
+
+    Retention is permanent: this module carries no statement that
+    updates or deletes a retained result, and no expiry sweeps one away.
+    A repetition arriving long afterwards therefore still finds its
+    original outcome instead of being treated as a new operation. The
+    primary key refuses a second row for one identity rather than
+    overwriting the first.
+
+    Args:
+        connection: An open connection holding the write transaction.
+        operation_id: Identity of the resolved operation.
+        canonical_request: The canonical request text to retain.
+        result: The terminal result to retain.
+
+    Raises:
+        sqlite3.IntegrityError: If that identity already carries a
+            retained result.
+    """
+    connection.execute(
+        INSERT_OPERATION,
+        (
+            str(operation_id),
+            canonical_request,
+            result.outcome,
+            result.original_http_status,
+            result.model_dump_json(),
+            to_utc_microseconds(result.resolved_at),
+        ),
+    )
 
 
 def _require_task(

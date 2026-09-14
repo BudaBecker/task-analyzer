@@ -581,7 +581,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T16: Implement the operation result ledger
+### T16: Implement the operation result ledger [Complete]
 
 **What**: Add the ledger read and the in-transaction write of an immutable terminal operation result.
 **Where**: `src/task-analyzer-server/task_analyzer_server/storage.py` (modify)
@@ -596,13 +596,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] The ledger read returns the stored terminal result or an explicit unknown; unknown is never represented as a rejection.
-- [ ] The write stores the operation UUID, the canonical request text itself, the terminal outcome, the original HTTP status, the immutable serialized result, and the server resolution timestamp inside the caller's open transaction.
-- [ ] A stored result is never updated or deleted; retention has no TTL and no purge.
-- [ ] Result rows survive independently of task rows, with no cascading task foreign key.
-- [ ] Integration tests confirm that canonical-request equality is compared against the stored text, that a second write for the same operation identity does not overwrite the original, and that a committed result is readable by a new connection.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 12 tests pass in `tests/server/integration/test_storage_operations.py` (no silent deletions).
+- [x] The ledger read returns the stored terminal result or an explicit unknown; unknown is never represented as a rejection.
+- [x] The write stores the operation UUID, the canonical request text itself, the terminal outcome, the original HTTP status, the immutable serialized result, and the server resolution timestamp inside the caller's open transaction.
+- [x] A stored result is never updated or deleted; retention has no TTL and no purge.
+- [x] Result rows survive independently of task rows, with no cascading task foreign key.
+- [x] Integration tests confirm that canonical-request equality is compared against the stored text, that a second write for the same operation identity does not overwrite the original, and that a committed result is readable by a new connection.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 12 tests pass in `tests/server/integration/test_storage_operations.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full
