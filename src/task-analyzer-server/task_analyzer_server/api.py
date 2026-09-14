@@ -150,6 +150,26 @@ async def configure_product_time_zone(request: Request) -> Response:
     )
 
 
+@router.get("/tasks")
+def read_tasks(request: Request) -> Response:
+    """Publish every managed task with the context of one reading.
+
+    The reading carries no sorting, filtering, pagination, emphasis or
+    metric: those are presentation and analysis concerns, not this
+    route's.
+
+    Args:
+        request: The submitted HTTP request.
+
+    Returns:
+        The managed tasks and the time context of this reading.
+    """
+    return published(
+        services.read_task_list(_settings_of(request), _clock_of(request)),
+        OK_STATUS,
+    )
+
+
 @router.get("/operations/{operation_id}")
 def read_operation_result(request: Request, operation_id: str) -> Response:
     """Consult the outcome one operation established.

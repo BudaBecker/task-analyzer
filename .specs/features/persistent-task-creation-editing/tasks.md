@@ -843,12 +843,12 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] The route returns all non-deleted tasks from a fresh committed snapshot with one sampled server time and the retained product zone per response.
-- [ ] An empty collection returns an empty `items` array, and no sorting, filtering, pagination, emphasis, or metric is introduced.
-- [ ] Responses carry `Cache-Control: no-store`, and array order is not asserted as a product guarantee.
-- [ ] E2E tests cover an empty collection, a populated collection after creation, and exclusion of a fixture-deleted task.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 8 tests pass in `tests/server/integration/test_api_tasks_read.py` (no silent deletions).
+- [x] The route returns all non-deleted tasks from a fresh committed snapshot with one sampled server time and the retained product zone per response.
+- [x] An empty collection returns an empty `items` array, and no sorting, filtering, pagination, emphasis, or metric is introduced.
+- [x] Responses carry `Cache-Control: no-store`, and array order is not asserted as a product guarantee.
+- [x] E2E tests cover an empty collection, a populated collection after creation, and exclusion of a fixture-deleted task.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 8 tests pass in `tests/server/integration/test_api_tasks_read.py` (no silent deletions).
 
 **Tests**: e2e
 **Gate**: full

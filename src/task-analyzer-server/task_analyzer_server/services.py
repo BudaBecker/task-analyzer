@@ -53,6 +53,7 @@ from task_analyzer_server.contracts import (
     OperationResult,
     TaskInput,
     TaskInputError,
+    TaskListView,
     TaskSnapshot,
     ValidationIssue,
     parse_task_input,
@@ -366,9 +367,37 @@ def configuration_view(
         configured=zone_key is not None,
         product_time_zone=zone_key,
         server_now=now,
-        product_date=(
-            None if zone_key is None else product_date(now, ZoneInfo(zone_key))
-        ),
+        product_date=_product_date_in(now, zone_key),
+    )
+
+
+def read_task_list(settings: ServerSettings, clock: Clock) -> TaskListView:
+    """Read every managed task with the time context of one reading.
+
+    Tasks and the retained zone come from the same committed snapshot,
+    and the server instant is sampled once, so a reading is internally
+    consistent: its product date always belongs to the instant it
+    publishes. The order the tasks arrive in is not a product guarantee.
+
+    Args:
+        settings: Runtime configuration naming the database.
+        clock: The server's source of the current instant.
+
+    Returns:
+        The managed tasks, empty when nothing is managed, together with
+        the zone and time context of this reading.
+    """
+    with storage.open_connection(
+        settings.database_path, settings.db_busy_timeout_ms
+    ) as connection:
+        zone_key = storage.read_product_time_zone(connection)
+        tasks = storage.read_tasks(connection)
+    now = clock.now()
+    return TaskListView(
+        items=tasks,
+        product_time_zone=zone_key,
+        server_now=now,
+        product_date=_product_date_in(now, zone_key),
     )
 
 
@@ -393,6 +422,20 @@ def require_product_time_zone(connection: sqlite3.Connection) -> str:
     if zone_key is None:
         raise ProtocolRefusalError(ErrorCode.PRODUCT_TIME_ZONE_REQUIRED)
     return zone_key
+
+
+def _product_date_in(now: datetime, zone_key: str | None) -> date | None:
+    """Read one sampled instant as the product date.
+
+    Args:
+        now: The sampled server instant.
+        zone_key: The retained IANA key, or ``None`` while unset.
+
+    Returns:
+        The product date at that instant, or ``None`` while no zone is
+        configured. No zone is ever invented to produce a date.
+    """
+    return None if zone_key is None else product_date(now, ZoneInfo(zone_key))
 
 
 def _apply_creation(
