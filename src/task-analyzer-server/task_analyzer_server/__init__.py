@@ -1,2 +1,1 @@
-"""Task Analyzer server package.
-"""
+"""Task Analyzer server package."""

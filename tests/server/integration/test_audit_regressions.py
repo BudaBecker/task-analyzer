@@ -1,5 +1,4 @@
-"""F1-F5 regressions: REQ-007/010/028/031, PCE-15/30/34/38/43.
-"""
+"""F1-F5 regressions: REQ-007/010/028/031, PCE-15/30/34/38/43."""
 
 import json
 import logging

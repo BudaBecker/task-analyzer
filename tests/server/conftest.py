@@ -1,5 +1,4 @@
-"""Shared fixtures never use a configured runtime database.
-"""
+"""Shared fixtures never use a configured runtime database."""
 
 from pathlib import Path
 

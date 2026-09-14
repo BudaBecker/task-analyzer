@@ -1,5 +1,4 @@
-"""Shared test setup; clocks are explicit and databases are disposable.
-"""
+"""Shared test setup; clocks are explicit and databases are disposable."""
 
 from datetime import datetime
 from pathlib import Path
