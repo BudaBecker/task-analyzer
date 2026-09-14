@@ -372,7 +372,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T8: Implement the title comparison key
+### T8: Implement the title comparison key [Complete]
 
 **What**: Add `title_key` deriving the uniqueness comparison key without altering submitted text.
 **Where**: `src/task-analyzer-server/task_analyzer_server/domain.py` (modify)
@@ -387,12 +387,12 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] The key trims edge spaces, collapses runs of internal U+0020 to one space, and applies Unicode case folding while retaining accents.
-- [ ] Accents are never stripped, compatibility normalization is not applied, and interior tabs or newlines are not collapsed into spaces.
-- [ ] Key generation is centralized so checks and stored keys always use the identical function; submitted text is returned unchanged alongside the key.
-- [ ] Unit tests preserve the protected examples: `Read notes` and the doubly spaced uppercase variant produce the same key, while `Review résumé` and `Review resume` produce different keys.
-- [ ] Gate check passes: `python -m pytest tests/server/unit`.
-- [ ] Test count: at least 10 tests pass in `tests/server/unit/test_domain_title_key.py` (no silent deletions).
+- [x] The key trims edge spaces, collapses runs of internal U+0020 to one space, and applies Unicode case folding while retaining accents.
+- [x] Accents are never stripped, compatibility normalization is not applied, and interior tabs or newlines are not collapsed into spaces.
+- [x] Key generation is centralized so checks and stored keys always use the identical function; submitted text is returned unchanged alongside the key.
+- [x] Unit tests preserve the protected examples: `Read notes` and the doubly spaced uppercase variant produce the same key, while `Review résumé` and `Review resume` produce different keys.
+- [x] Gate check passes: `python -m pytest tests/server/unit`.
+- [x] Test count: at least 10 tests pass in `tests/server/unit/test_domain_title_key.py` (no silent deletions).
 
 **Tests**: unit
 **Gate**: quick

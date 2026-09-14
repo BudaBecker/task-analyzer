@@ -1,7 +1,7 @@
-"""Business validation of submitted task fields.
+"""Business rules for submitted task fields.
 
-Covers PCE-01 through PCE-10, PCE-15, PCE-16, PCE-48, PCE-51 and PCE-52
-(REQ-007, REQ-008, REQ-011).
+Covers PCE-01 through PCE-10, PCE-15 through PCE-18, PCE-23, PCE-48,
+PCE-51 and PCE-52 (REQ-007, REQ-008, REQ-011, REQ-029).
 
 Limits are expressed in user-perceived characters: default extended
 grapheme clusters under Unicode UAX #29, segmented with the pinned
@@ -13,6 +13,10 @@ Validation reads parsed input and reports issues. It never trims,
 rewrites or truncates the text it accepts, and it never resolves a
 deadline's cutoff: the supported calendar range is settled here, before
 any time arithmetic runs.
+
+Title uniqueness compares derived keys, never submitted text. This
+module owns the single derivation, so a stored key and a conflict check
+can never disagree. Submitted titles stay exactly as submitted.
 
 The dependency runs one way only, from this module to ``contracts``.
 """
@@ -39,9 +43,11 @@ MINIMUM_DEADLINE = date(1, 1, 1)
 MAXIMUM_DEADLINE = date(9999, 12, 30)
 
 TITLE_EDGE_SPACE = " "
+COMPARISON_SPACE = " "
 
 _GRAPHEME_CLUSTER = regex.compile(r"\X")
 _DEADLINE_TEXT = regex.compile(r"\A[0-9]{4}-[0-9]{2}-[0-9]{2}\Z")
+_COMPARISON_SPACE_RUN = regex.compile(f"{COMPARISON_SPACE}{{2,}}")
 
 
 def validate_task(data: TaskInput) -> tuple[ValidationIssue, ...]:
@@ -60,6 +66,30 @@ def validate_task(data: TaskInput) -> tuple[ValidationIssue, ...]:
         _deadline_issue(data.deadline),
     )
     return tuple(issue for issue in candidates if issue is not None)
+
+
+def title_key(title: str) -> str:
+    """Derive the uniqueness comparison key of a submitted title.
+
+    The key trims edge spaces, reduces every run of comparison spaces to
+    one, and applies Unicode case folding. Accents are retained, no
+    compatibility normalization runs, and interior tabs or line breaks
+    stay as they are rather than becoming spaces. Any further
+    equivalence would need its own approval.
+
+    This is the only derivation: stored keys and conflict checks both
+    call it, so they cannot disagree. The submitted title is returned to
+    the caller untouched, and is stored separately from its key.
+
+    Args:
+        title: Submitted title text.
+
+    Returns:
+        The comparison key for that title.
+    """
+    trimmed = title.strip(TITLE_EDGE_SPACE)
+    collapsed: str = _COMPARISON_SPACE_RUN.sub(COMPARISON_SPACE, trimmed)
+    return collapsed.casefold()
 
 
 def _title_issue(title: str) -> ValidationIssue | None:
