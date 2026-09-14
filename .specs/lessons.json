@@ -3,6 +3,43 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 1,
-  "lessons": []
+  "next_id": 3,
+  "lessons": [
+    {
+      "id": "L-001",
+      "key": "surviving_mutant::pin approved configuration and packaging values with a test that fails when the value is changed because a metadata only decision breaks no other test when it is reversed",
+      "text": "Pin approved configuration and packaging values with a test that fails when the value is changed, because a metadata-only decision breaks no other test when it is reversed.",
+      "signal": "surviving_mutant",
+      "scope": "packaging",
+      "status": "candidate",
+      "features": [
+        "persistent-task-creation-editing"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "validation.md Finding 2 (mutant M11); pyproject.toml:9 (packaging)"
+      ],
+      "created": "2026-09-14T10:25:35Z",
+      "last_seen": "2026-09-14T10:25:35Z"
+    },
+    {
+      "id": "L-002",
+      "key": "surviving_mutant::run discrimination mutations with pythonpath pinned to the scratch copy and verify the module resolved there because an editable install resolves imports back to the real checkout and every mutant falsely survives",
+      "text": "Run discrimination mutations with PYTHONPATH pinned to the scratch copy and verify the module resolved there, because an editable install resolves imports back to the real checkout and every mutant falsely survives.",
+      "signal": "surviving_mutant",
+      "scope": "verification",
+      "status": "candidate",
+      "features": [
+        "persistent-task-creation-editing"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "validation.md sensor pass 1 (all 10 mutants falsely survived) (verification)"
+      ],
+      "created": "2026-09-14T10:25:40Z",
+      "last_seen": "2026-09-14T10:25:40Z"
+    }
+  ]
 }
