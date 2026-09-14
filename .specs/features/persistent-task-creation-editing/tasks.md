@@ -551,7 +551,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T15: Implement task storage access
+### T15: Implement task storage access [Complete]
 
 **What**: Add task insert, update, managed-task reads, and the uniqueness conflict lookup.
 **Where**: `src/task-analyzer-server/task_analyzer_server/storage.py` (modify)
@@ -566,13 +566,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] Insert stores a server-generated UUID identity, submitted text, the derived `title_key`, status `pending`, `is_deleted=0`, no completion timestamp, and the supplied creation instant.
-- [ ] Update replaces the editable fields and the derived key while leaving identity, creation time, and status untouched.
-- [ ] Managed-task reads exclude `is_deleted=1` rows and return a committed snapshot.
-- [ ] The conflict lookup implements both populations - dated `(title_key, deadline_date)` across pending and completed rows, undated `title_key` across pending rows only - excludes deleted rows, and excludes a supplied task identity from comparison.
-- [ ] Integration tests cover each uniqueness population with the protected title examples, including dated versus undated coexistence, different deadline dates, self-exclusion, completed undated candidates, and deleted candidates, using fixtures for completed and deleted rows.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 22 tests pass in `tests/server/integration/test_storage_tasks.py` (no silent deletions).
+- [x] Insert stores a server-generated UUID identity, submitted text, the derived `title_key`, status `pending`, `is_deleted=0`, no completion timestamp, and the supplied creation instant.
+- [x] Update replaces the editable fields and the derived key while leaving identity, creation time, and status untouched.
+- [x] Managed-task reads exclude `is_deleted=1` rows and return a committed snapshot.
+- [x] The conflict lookup implements both populations - dated `(title_key, deadline_date)` across pending and completed rows, undated `title_key` across pending rows only - excludes deleted rows, and excludes a supplied task identity from comparison.
+- [x] Integration tests cover each uniqueness population with the protected title examples, including dated versus undated coexistence, different deadline dates, self-exclusion, completed undated candidates, and deleted candidates, using fixtures for completed and deleted rows.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 22 tests pass in `tests/server/integration/test_storage_tasks.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full
