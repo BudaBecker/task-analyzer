@@ -430,7 +430,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T10: Implement deadline cutoff resolution
+### T10: Implement deadline cutoff resolution [Complete]
 
 **What**: Add `deadline_cutoff` converting a calendar deadline into its UTC cutoff instant, including the approved exceptional-midnight rules.
 **Where**: `src/task-analyzer-server/task_analyzer_server/clock.py` (modify)
@@ -445,13 +445,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] The cutoff is the next calendar date's local midnight in the product zone converted to UTC, never the deadline start plus 24 hours.
-- [ ] A repeated midnight resolves to its first UTC occurrence; an absent midnight resolves to the first valid instant at or after the nominal next-day boundary, including after a wholly skipped date, located by bracketing the transition with integer-microsecond bisection rather than by adding an offset difference.
-- [ ] Resolved instants are validated against the intended calendar boundary before being returned, including the preceding-microsecond check. Fixtures cover the supported date endpoints with UTC and positive/negative-offset zones. No overflow may become an invented cutoff or an accepted out-of-range deadline.
-- [ ] A pending task whose cutoff has been reached is reported as overdue under the deadline semantics; no emphasis category and no grace period are introduced.
-- [ ] Unit tests preserve the approved September 14 example: valid throughout September 14 and overdue at September 15 00:00 in the product zone. Repeated-midnight and missing-midnight fixtures use expected instants from independently checked zone-transition data, never from calling the helper under test. A `2011-12-29` deadline in `Pacific/Apia` resolves to `2011-12-30T10:00:00.000000Z`, skipping the absent December 30 local date.
-- [ ] Gate check passes: `python -m pytest tests/server/unit`.
-- [ ] Test count: at least 12 tests pass in `tests/server/unit/test_clock_cutoff.py` (no silent deletions).
+- [x] The cutoff is the next calendar date's local midnight in the product zone converted to UTC, never the deadline start plus 24 hours.
+- [x] A repeated midnight resolves to its first UTC occurrence; an absent midnight resolves to the first valid instant at or after the nominal next-day boundary, including after a wholly skipped date, located by bracketing the transition with integer-microsecond bisection rather than by adding an offset difference.
+- [x] Resolved instants are validated against the intended calendar boundary before being returned, including the preceding-microsecond check. Fixtures cover the supported date endpoints with UTC and positive/negative-offset zones. No overflow may become an invented cutoff or an accepted out-of-range deadline.
+- [x] A pending task whose cutoff has been reached is reported as overdue under the deadline semantics; no emphasis category and no grace period are introduced.
+- [x] Unit tests preserve the approved September 14 example: valid throughout September 14 and overdue at September 15 00:00 in the product zone. Repeated-midnight and missing-midnight fixtures use expected instants from independently checked zone-transition data, never from calling the helper under test. A `2011-12-29` deadline in `Pacific/Apia` resolves to `2011-12-30T10:00:00.000000Z`, skipping the absent December 30 local date.
+- [x] Gate check passes: `python -m pytest tests/server/unit`.
+- [x] Test count: at least 12 tests pass in `tests/server/unit/test_clock_cutoff.py` (no silent deletions).
 
 **Tests**: unit
 **Gate**: quick
