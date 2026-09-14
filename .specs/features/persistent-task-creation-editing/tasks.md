@@ -196,7 +196,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T3: Implement validated runtime settings
+### T3: Implement validated runtime settings [Complete]
 
 **What**: Add `ServerSettings` reading and validating the approved environment values with no implicit database fallback.
 **Where**: `src/task-analyzer-server/task_analyzer_server/settings.py`
@@ -211,12 +211,12 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] `TASK_ANALYZER_DATABASE_PATH` is required and must be absolute; a missing or relative value raises a specific error naming the variable.
-- [ ] `TASK_ANALYZER_LOG_LEVEL` defaults to `INFO` and `TASK_ANALYZER_DB_BUSY_TIMEOUT_MS` defaults to `5000`; invalid values are rejected rather than silently coerced.
-- [ ] No default points at a development or production database; every test supplies its own disposable path.
-- [ ] Google-style docstrings and complete type annotations are present. With this first substantive module, `python -m pip install --no-deps -e .` and importing `task_analyzer_server.settings` succeed in the locked environment; no empty package stub is needed.
-- [ ] Gate check passes: `python -m pytest tests/server/unit`.
-- [ ] Test count: at least 8 tests pass in `tests/server/unit/test_settings.py` (no silent deletions).
+- [x] `TASK_ANALYZER_DATABASE_PATH` is required and must be absolute; a missing or relative value raises a specific error naming the variable.
+- [x] `TASK_ANALYZER_LOG_LEVEL` defaults to `INFO` and `TASK_ANALYZER_DB_BUSY_TIMEOUT_MS` defaults to `5000`; invalid values are rejected rather than silently coerced.
+- [x] No default points at a development or production database; every test supplies its own disposable path.
+- [x] Google-style docstrings and complete type annotations are present. With this first substantive module, `python -m pip install --no-deps -e .` and importing `task_analyzer_server.settings` succeed in the locked environment; no empty package stub is needed.
+- [x] Gate check passes: `python -m pytest tests/server/unit`.
+- [x] Test count: at least 8 tests pass in `tests/server/unit/test_settings.py` (no silent deletions).
 
 **Tests**: unit
 **Gate**: quick
