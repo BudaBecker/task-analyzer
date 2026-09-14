@@ -765,7 +765,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T22: Compose the HTTP application with operation lookup and error handling
+### T22: Compose the HTTP application with operation lookup and error handling [Complete]
 
 **What**: Deliver one self-testable HTTP boundary: composition, startup verification, runtime factory, protocol handlers and the first concrete operation-lookup route.
 **Where**: `src/task-analyzer-server/task_analyzer_server/` (the HTTP boundary in `app.py` and `api.py`)
@@ -799,7 +799,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T23: Add the configuration routes
+### T23: Add the configuration routes [Complete]
 
 **What**: Add `GET /v1/configuration` and `PUT /v1/configuration` over the configuration service.
 **Where**: `src/task-analyzer-server/task_analyzer_server/api.py`
@@ -828,7 +828,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T24: Add the task list route
+### T24: Add the task list route [Complete]
 
 **What**: Add `GET /v1/tasks` returning managed tasks with the sampled server time and product zone.
 **Where**: `src/task-analyzer-server/task_analyzer_server/api.py` (modify)
@@ -857,7 +857,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T25: Add the task creation route
+### T25: Add the task creation route [Complete]
 
 **What**: Add `POST /v1/tasks` carrying the operation envelope into the creation command.
 **Where**: `src/task-analyzer-server/task_analyzer_server/api.py` (modify)
@@ -887,7 +887,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T26: Add the task edit route
+### T26: Add the task edit route [Complete]
 
 **What**: Add `PUT /v1/tasks/{task_id}` carrying the operation envelope into the pending-task edit command.
 **Where**: `src/task-analyzer-server/task_analyzer_server/api.py` (modify)
@@ -917,7 +917,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T27: Verify initialization and startup from the installed wheel
+### T27: Verify initialization and startup from the installed wheel [Complete]
 
 **What**: Prove the installed distribution can initialize a disposable database and run the documented Uvicorn factory outside the checkout.
 **Where**: `tests/server/integration/test_installed_distribution.py`
@@ -947,7 +947,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T28: Verify durability across restart and fresh sessions
+### T28: Verify durability across restart and fresh sessions [Complete]
 
 **What**: Add the restart and fresh-session suite asserting that confirmed state and the configured zone survive a new server process.
 **Where**: `tests/server/integration/test_durability.py`
