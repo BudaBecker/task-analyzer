@@ -24,9 +24,9 @@ Run the full suite, Ruff formatting/lint, strict mypy, dependency checks, packag
 
 The repository now uses `pyproject.toml`, `uv.lock`, `.python-version` and an ignored persistent `.venv`; the former pip-tools requirements set was removed. The five audit defects were fixed with 14 focused regressions: initialization ownership, event-loop blocking, non-finite/overflow JSON numbers, consistent list snapshots and Uvicorn JSON logs.
 
-Active documentation fell from 17 files / 3,181 lines to 10 files / 745 lines. Python source stayed at 11 files and fell from 3,760 to 2,082 lines by removing restated contracts from docstrings; an AST comparison confirmed that this cleanup changed no executable statements. Tests fell from 29 files / 11,973 lines / 588 cases to 27 files / 8,062 lines / 508 cases. The final suite includes the 14 new audit regressions; 94 redundant lower-layer cases were retired, for a net reduction of 80 cases from the baseline. Shared clocks, settings and disposable paths now live in two small helpers.
+Active documentation fell from 17 files / 3,181 lines to 10 files / 745 lines. Python source stayed at 11 files and fell from 3,760 to 2,082 lines by removing restated contracts from docstrings; an AST comparison confirmed that this cleanup changed no executable statements. Tests fell from 29 files / 11,973 lines / 588 cases to 24 files / 7,061 lines / 393 cases. The final suite includes the 14 new audit regressions; 209 cases repeated at lower layers were retired, for a net reduction of 195 cases from the baseline. Shared clocks, settings and disposable paths now live in two small helpers.
 
-Final local verification passed: locked sync, Ruff format/lint, strict mypy, dependency compatibility, 508 tests, source distribution and wheel build. The suite includes the installed-wheel startup/restart smoke test. Two third-party deprecation warnings remain in Starlette's current test client integration.
+Final local verification passed: locked sync, Ruff format/lint, strict mypy, dependency compatibility, 393 tests, source distribution and wheel build. The suite includes the installed-wheel startup/restart smoke test. Two third-party deprecation warnings remain in Starlette's current test client integration.
 
 ## Open questions
 

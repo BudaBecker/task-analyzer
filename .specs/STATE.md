@@ -45,7 +45,7 @@ Approved product inputs remain in [Requirements](../docs/product/requirements.md
 - **Work**: Approved project simplification is complete locally; new features remain paused pending review. See [maintenance](../docs/maintenance.md) for results.
 - **Branch**: `fix/project-simplification`, based on the preserved audit at `8c68d6a`.
 - **Next step**: Review the simplification report and decide when to resume feature planning under lightweight SDD.
-- **Result**: uv and `.venv` are established; F1-F5 are fixed; active documentation, source commentary and duplicate tests are reduced. The final 508-case suite and quality/build checks pass.
+- **Result**: uv and `.venv` are established; F1-F5 are fixed; active documentation, source commentary and duplicate tests are reduced. The final 393-case suite and quality/build checks pass.
 - **Authorization**: Local maintenance implementation and commits. No push, merge, deployment or real database changes.
 - **Existing local change**: `.specs/features/.gitkeep` was already deleted before maintenance; preserve it separately from maintenance commits.
 - **External checks**: Actual Ubuntu interpreter/lock and Tailscale access remain pending; local maintenance completion does not claim deployment verification.
