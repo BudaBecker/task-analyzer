@@ -611,7 +611,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T17: Implement the transactional operation runner
+### T17: Implement the transactional operation runner [Complete]
 
 **What**: Add the canonical request builder and the shared operation runner that resolves replays and protocol conflicts inside one transaction.
 **Where**: `src/task-analyzer-server/task_analyzer_server/services.py`
@@ -626,16 +626,16 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] The canonical representation covers API version, method, canonical task target, and parsed JSON values before business normalization; object-key order and JSON whitespace do not change identity, while a changed field value or target does.
-- [ ] `BEGIN IMMEDIATE` is acquired before the ledger check and before any uniqueness check.
-- [ ] A repeated operation identity with the same canonical request returns the stored result without validating or applying the command again.
-- [ ] A reused operation identity with a different canonical request returns a protocol conflict and preserves the original ledger entry and all task data.
-- [ ] A terminal result is stored in the same transaction as its mutation, the transaction commits before any terminal response is produced, and an unexpected storage error ends the transaction without producing a terminal outcome.
-- [ ] The runner is reusable by delivery 1B commands without modification.
-- [ ] `lookup_operation(operation_id)` reads the committed ledger without a write transaction, returning its retained result or unknown; integration tests cover both outcomes.
-- [ ] Integration tests cover replay of a success, replay of a rejection, identity reuse with different content, and a commit failure that is not reported as persisted.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 16 tests pass in `tests/server/integration/test_services_runner.py` (no silent deletions).
+- [x] The canonical representation covers API version, method, canonical task target, and parsed JSON values before business normalization; object-key order and JSON whitespace do not change identity, while a changed field value or target does.
+- [x] `BEGIN IMMEDIATE` is acquired before the ledger check and before any uniqueness check.
+- [x] A repeated operation identity with the same canonical request returns the stored result without validating or applying the command again.
+- [x] A reused operation identity with a different canonical request returns a protocol conflict and preserves the original ledger entry and all task data.
+- [x] A terminal result is stored in the same transaction as its mutation, the transaction commits before any terminal response is produced, and an unexpected storage error ends the transaction without producing a terminal outcome.
+- [x] The runner is reusable by delivery 1B commands without modification.
+- [x] `lookup_operation(operation_id)` reads the committed ledger without a write transaction, returning its retained result or unknown; integration tests cover both outcomes.
+- [x] Integration tests cover replay of a success, replay of a rejection, identity reuse with different content, and a commit failure that is not reported as persisted.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 16 tests pass in `tests/server/integration/test_services_runner.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full
