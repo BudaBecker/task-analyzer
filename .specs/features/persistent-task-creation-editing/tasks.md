@@ -932,13 +932,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] Build a wheel with `python -m build --no-isolation` using T2's locked build backend and install it with validated locked runtime dependencies in a fresh temporary environment. All smoke subprocesses run from a separate temporary directory without editable installation, checkout paths or PYTHONPATH fallback.
-- [ ] Verify the installed package contains `schema/001_initial.sql`; its initializer creates only a newly allocated disposable database with a readable schema version.
-- [ ] Launch `python -m uvicorn task_analyzer_server.app:application_factory --factory --host 127.0.0.1 --port <allocated-test-port>` with that database. Bounded readiness checks verify unconfigured configuration, zone setup, task creation and persisted reads after process restart.
-- [ ] Verify startup with an absent database fails visibly without creating it. Child processes and disposable resources are cleaned up even after assertion failures.
-- [ ] Build once per session, never invoke pytest recursively, and use locked dependency artifacts without resolving upgrades. No systemd, Tailscale or real-host changes occur.
-- [ ] Gate check passes: `python -m pytest tests/server`, including this suite; it runs under subsequent Build gates too.
-- [ ] Test count: at least 4 tests pass in `tests/server/integration/test_installed_distribution.py` (no silent deletions).
+- [x] Build a wheel with `python -m build --no-isolation` using T2's locked build backend and install it with validated locked runtime dependencies in a fresh temporary environment. All smoke subprocesses run from a separate temporary directory without editable installation, checkout paths or PYTHONPATH fallback.
+- [x] Verify the installed package contains `schema/001_initial.sql`; its initializer creates only a newly allocated disposable database with a readable schema version.
+- [x] Launch `python -m uvicorn task_analyzer_server.app:application_factory --factory --host 127.0.0.1 --port <allocated-test-port>` with that database. Bounded readiness checks verify unconfigured configuration, zone setup, task creation and persisted reads after process restart.
+- [x] Verify startup with an absent database fails visibly without creating it. Child processes and disposable resources are cleaned up even after assertion failures.
+- [x] Build once per session, never invoke pytest recursively, and use locked dependency artifacts without resolving upgrades. No systemd, Tailscale or real-host changes occur.
+- [x] Gate check passes: `python -m pytest tests/server`, including this suite; it runs under subsequent Build gates too.
+- [x] Test count: at least 4 tests pass in `tests/server/integration/test_installed_distribution.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full
