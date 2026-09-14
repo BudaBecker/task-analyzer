@@ -32,6 +32,8 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 BEGIN_IMMEDIATE = "BEGIN IMMEDIATE"
@@ -51,6 +53,46 @@ DURABILITY_PRAGMAS: tuple[tuple[str, str, str | int], ...] = (
 ``synchronous`` reports the numeric level, where ``3`` is ``EXTRA``, and
 ``foreign_keys`` reports ``1`` when enforcement is on.
 """
+
+
+READ_PRODUCT_TIME_ZONE = (
+    "SELECT product_time_zone FROM product_configuration"
+    " WHERE configuration_id = 1"
+)
+INSERT_PRODUCT_TIME_ZONE = (
+    "INSERT INTO product_configuration"
+    " (configuration_id, product_time_zone) VALUES (1, ?)"
+)
+
+
+class ZoneOutcome(StrEnum):
+    """What a compare-and-set attempt found on the singleton row.
+
+    Attributes:
+        STORED: The singleton was unset and now holds the requested key.
+        ALREADY_SET: The singleton already held exactly that key.
+        CONFLICTING: The singleton already held a different key, which
+            was kept.
+    """
+
+    STORED = "stored"
+    ALREADY_SET = "already_set"
+    CONFLICTING = "conflicting"
+
+
+@dataclass(frozen=True, slots=True)
+class ConfiguredZone:
+    """The product time zone after a compare-and-set attempt.
+
+    Attributes:
+        outcome: What the attempt found on the singleton row.
+        product_time_zone: The retained IANA key once the attempt
+            finished. It is the requested key except when the outcome
+            is ``CONFLICTING``.
+    """
+
+    outcome: ZoneOutcome
+    product_time_zone: str
 
 
 class DurabilityPolicyError(RuntimeError):
@@ -126,6 +168,50 @@ def write_transaction(connection: sqlite3.Connection) -> Iterator[None]:
         if connection.in_transaction:
             connection.rollback()
         raise
+
+
+def read_product_time_zone(connection: sqlite3.Connection) -> str | None:
+    """Read the retained product time zone.
+
+    Args:
+        connection: An open connection from :func:`open_connection`.
+
+    Returns:
+        The retained IANA key, or ``None`` when the singleton is unset.
+        An unconfigured database reports its absence; no zone is ever
+        invented for it.
+    """
+    row = connection.execute(READ_PRODUCT_TIME_ZONE).fetchone()
+    return None if row is None else str(row[0])
+
+
+def store_product_time_zone(
+    connection: sqlite3.Connection, zone_key: str
+) -> ConfiguredZone:
+    """Set the product time zone only while the singleton is unset.
+
+    This is a compare-and-set: the caller holds the write transaction
+    from :func:`write_transaction`, so the read and the insert belong to
+    one serialized write. There is no statement anywhere in this module
+    that updates or deletes the singleton, so a retained zone cannot be
+    replaced even by a defect elsewhere, and the primary key refuses a
+    second row should a write ever reach storage without the lock.
+
+    Args:
+        connection: An open connection holding the write transaction.
+        zone_key: The IANA key the caller wants retained. Validity is
+            the caller's business rule, not storage's.
+
+    Returns:
+        What the attempt found and the zone retained afterwards.
+    """
+    retained = read_product_time_zone(connection)
+    if retained is None:
+        connection.execute(INSERT_PRODUCT_TIME_ZONE, (zone_key,))
+        return ConfiguredZone(ZoneOutcome.STORED, zone_key)
+    if retained == zone_key:
+        return ConfiguredZone(ZoneOutcome.ALREADY_SET, retained)
+    return ConfiguredZone(ZoneOutcome.CONFLICTING, retained)
 
 
 def _open(path: Path, busy_timeout_ms: int) -> sqlite3.Connection:

@@ -522,7 +522,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T14: Implement product configuration storage
+### T14: Implement product configuration storage [Complete]
 
 **What**: Add the singleton configuration read and the compare-and-set insert for the fixed product time zone.
 **Where**: `src/task-analyzer-server/task_analyzer_server/storage.py` (modify)
@@ -537,12 +537,12 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] Reading an unconfigured database returns an explicit unset result rather than a fabricated zone.
-- [ ] The compare-and-set insert stores the zone only when the singleton is unset; an existing zone is never replaced, and the caller can distinguish an identical key from a different key.
-- [ ] All statements are parameterized; no SQL is built by string concatenation.
-- [ ] Integration tests confirm the stored zone is readable by a new connection after the transaction commits.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 8 tests pass in `tests/server/integration/test_storage_configuration.py` (no silent deletions).
+- [x] Reading an unconfigured database returns an explicit unset result rather than a fabricated zone.
+- [x] The compare-and-set insert stores the zone only when the singleton is unset; an existing zone is never replaced, and the caller can distinguish an identical key from a different key.
+- [x] All statements are parameterized; no SQL is built by string concatenation.
+- [x] Integration tests confirm the stored zone is readable by a new connection after the transaction commits.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 8 tests pass in `tests/server/integration/test_storage_configuration.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full
