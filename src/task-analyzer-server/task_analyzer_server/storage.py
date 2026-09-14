@@ -1,0 +1,239 @@
+"""SQLite access for the Task Analyzer server.
+
+Covers PCE-37 and PCE-43 (REQ-010, REQ-031).
+
+This module owns every connection, statement, and transaction boundary.
+Callers receive an open connection for the duration of one synchronous
+call and nothing outlives it: there is no shared global connection, no
+connection cached on a module attribute, and no transaction left open
+across an HTTP response.
+
+Durability is stated explicitly and then verified. SQLite ignores an
+unknown pragma silently, so a misspelling would otherwise leave a
+journal mode or a synchronization level weaker than the approved policy
+with no visible sign. Every applied pragma is therefore read back, and a
+mismatch fails loudly instead of being persisted against.
+
+Transactions are explicit. The connection runs with
+``isolation_level=None`` under legacy transaction control, so the driver
+opens no transaction of its own and the version-specific default cannot
+change what a statement does. Every write runs inside ``BEGIN
+IMMEDIATE``, which takes the write lock up front, so a ledger check and
+a uniqueness check made under it cannot be overtaken by a competing
+writer. ``executescript()`` is never used here because it commits any
+open transaction.
+
+A failed commit is an error, never persistence: the failure propagates,
+an active transaction is rolled back, and the connection is closed.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
+
+BEGIN_IMMEDIATE = "BEGIN IMMEDIATE"
+COMMIT = "COMMIT"
+
+EXISTING_FILE_MODE = "mode=rw"
+
+BUSY_TIMEOUT_PRAGMA = "busy_timeout"
+
+DURABILITY_PRAGMAS: tuple[tuple[str, str, str | int], ...] = (
+    ("journal_mode", "DELETE", "delete"),
+    ("synchronous", "EXTRA", 3),
+    ("foreign_keys", "ON", 1),
+)
+"""Pragma name, the setting applied, and the value expected back.
+
+``synchronous`` reports the numeric level, where ``3`` is ``EXTRA``, and
+``foreign_keys`` reports ``1`` when enforcement is on.
+"""
+
+
+class DurabilityPolicyError(RuntimeError):
+    """Raised when a connection does not report the approved policy.
+
+    The message names the pragma and both values, so an operator sees
+    which setting was ignored rather than a generic storage failure.
+    """
+
+
+@contextmanager
+def open_connection(
+    path: Path, busy_timeout_ms: int
+) -> Iterator[sqlite3.Connection]:
+    """Open one connection to an existing database for one call.
+
+    The database file must already exist: the connection opens in
+    read/write mode without creation, so a running server can never
+    bring a database into being by pointing at a missing path.
+
+    On leaving the block an active transaction is rolled back and the
+    connection is closed, including when the body raised. Nothing is
+    reachable afterwards, which is what keeps connection ownership
+    inside the synchronous call that opened it.
+
+    Args:
+        path: Absolute path of the database file.
+        busy_timeout_ms: Bounded wait, in milliseconds, for a busy lock.
+
+    Yields:
+        The open connection, already verified against the policy.
+
+    Raises:
+        ValueError: If the path is not absolute.
+        DurabilityPolicyError: If an applied pragma does not read back
+            as the approved policy.
+        sqlite3.Error: If the database cannot be opened.
+    """
+    connection = _open(path, busy_timeout_ms)
+    try:
+        yield connection
+    finally:
+        if connection.in_transaction:
+            connection.rollback()
+        connection.close()
+
+
+@contextmanager
+def write_transaction(connection: sqlite3.Connection) -> Iterator[None]:
+    """Run the body inside one immediate write transaction.
+
+    The write lock is taken before the body runs, so every check the
+    body makes and every row it writes belong to the same serialized
+    write. The body's work becomes durable only when the commit itself
+    succeeds; a failing commit rolls back and propagates, and is never
+    translated into successful persistence.
+
+    Args:
+        connection: An open connection from :func:`open_connection`.
+
+    Yields:
+        ``None``, once the write lock is held.
+
+    Raises:
+        sqlite3.Error: If the transaction cannot be started, if the body
+            fails, or if the commit fails.
+    """
+    connection.execute(BEGIN_IMMEDIATE)
+    try:
+        yield
+        connection.execute(COMMIT)
+    except BaseException:
+        if connection.in_transaction:
+            connection.rollback()
+        raise
+
+
+def _open(path: Path, busy_timeout_ms: int) -> sqlite3.Connection:
+    """Open and verify one connection under the approved policy.
+
+    Args:
+        path: Absolute path of the database file.
+        busy_timeout_ms: Bounded wait, in milliseconds, for a busy lock.
+
+    Returns:
+        The open connection.
+
+    Raises:
+        ValueError: If the path is not absolute.
+        DurabilityPolicyError: If an applied pragma does not read back
+            as the approved policy. The connection is closed first.
+        sqlite3.Error: If the database cannot be opened.
+    """
+    if not path.is_absolute():
+        raise ValueError(
+            f"The database path must be absolute; got {str(path)!r}."
+            " A relative path would depend on the working directory of"
+            " the process."
+        )
+    # Legacy transaction control is pinned alongside the null isolation
+    # level so this module's explicit BEGIN IMMEDIATE, COMMIT and
+    # ROLLBACK stay authoritative whatever an interpreter defaults to.
+    # The documented sentinel is an integer the stubs declare as a bool.
+    connection: sqlite3.Connection
+    connection = sqlite3.connect(  # type: ignore[call-overload]
+        f"{path.as_uri()}?{EXISTING_FILE_MODE}",
+        uri=True,
+        isolation_level=None,
+        autocommit=sqlite3.LEGACY_TRANSACTION_CONTROL,
+        check_same_thread=True,
+    )
+    try:
+        _apply_policy(connection, busy_timeout_ms)
+    except BaseException:
+        connection.close()
+        raise
+    return connection
+
+
+def _apply_policy(
+    connection: sqlite3.Connection, busy_timeout_ms: int
+) -> None:
+    """Apply the approved pragmas and confirm each took effect.
+
+    Pragma statements accept no bound parameters, so the names and
+    settings are interpolated. They come from this module's constants
+    and from an already validated whole number of milliseconds; no
+    submitted value reaches the statement text.
+
+    Args:
+        connection: The freshly opened connection.
+        busy_timeout_ms: Bounded wait, in milliseconds, for a busy lock.
+
+    Raises:
+        DurabilityPolicyError: If any pragma does not read back as the
+            approved policy.
+    """
+    for name, setting, effective in DURABILITY_PRAGMAS:
+        connection.execute(f"PRAGMA {name} = {setting}")
+        _confirm_pragma(connection, name, effective)
+    connection.execute(
+        f"PRAGMA {BUSY_TIMEOUT_PRAGMA} = {int(busy_timeout_ms):d}"
+    )
+    _confirm_pragma(connection, BUSY_TIMEOUT_PRAGMA, int(busy_timeout_ms))
+
+
+def _confirm_pragma(
+    connection: sqlite3.Connection, name: str, expected: str | int
+) -> None:
+    """Read one pragma back and compare it with the approved value.
+
+    Args:
+        connection: The connection the pragma was applied to.
+        name: Pragma name.
+        expected: The value the pragma must report.
+
+    Raises:
+        DurabilityPolicyError: If the pragma reports anything else,
+            including nothing at all when the name is not recognized.
+    """
+    row = connection.execute(f"PRAGMA {name}").fetchone()
+    actual = None if row is None else row[0]
+    if not _reports(actual, expected):
+        raise DurabilityPolicyError(
+            f"PRAGMA {name} reports {actual!r} instead of the approved"
+            f" {expected!r}. An ignored or misspelled pragma would"
+            " silently weaken durability, so the connection is refused."
+        )
+
+
+def _reports(actual: object, expected: str | int) -> bool:
+    """Report whether a pragma read-back matches the approved value.
+
+    Args:
+        actual: The value the pragma reported.
+        expected: The value the policy requires.
+
+    Returns:
+        True when they match. Textual values compare without case,
+        because SQLite reports a mode in its own spelling.
+    """
+    if isinstance(expected, str):
+        return isinstance(actual, str) and actual.casefold() == (
+            expected.casefold()
+        )
+    return actual == expected

@@ -491,7 +491,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T13: Implement the SQLite connection and transaction policy
+### T13: Implement the SQLite connection and transaction policy [Complete]
 
 **What**: Add connection opening with verified PRAGMAs, the bounded lock wait, and the explicit immediate-transaction boundary.
 **Where**: `src/task-analyzer-server/task_analyzer_server/storage.py`
@@ -506,14 +506,14 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] Connections open an existing database file by absolute path with `journal_mode=DELETE`, `synchronous=EXTRA`, `foreign_keys=ON`, the configured busy timeout, and Python's thread check enabled.
-- [ ] Effective PRAGMA values are read back and a mismatch fails loudly, so a misspelled or ignored PRAGMA can never silently weaken durability.
-- [ ] Transactions use explicit `BEGIN IMMEDIATE` with `isolation_level=None`, and `executescript()` is never used inside an operation transaction.
-- [ ] Each connection is opened, used, and closed within the same synchronous call; no shared global connection exists and no transaction spans response streaming.
-- [ ] An unexpected error rolls back an active transaction and closes the connection; a failed commit is never reported as persisted.
-- [ ] Integration tests assert the read-back PRAGMA values, a bounded lock wait against a competing writer, and rollback on an injected error.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 10 tests pass in `tests/server/integration/test_storage_connection.py` (no silent deletions).
+- [x] Connections open an existing database file by absolute path with `journal_mode=DELETE`, `synchronous=EXTRA`, `foreign_keys=ON`, the configured busy timeout, and Python's thread check enabled.
+- [x] Effective PRAGMA values are read back and a mismatch fails loudly, so a misspelled or ignored PRAGMA can never silently weaken durability.
+- [x] Transactions use explicit `BEGIN IMMEDIATE` with `isolation_level=None`, and `executescript()` is never used inside an operation transaction.
+- [x] Each connection is opened, used, and closed within the same synchronous call; no shared global connection exists and no transaction spans response streaming.
+- [x] An unexpected error rolls back an active transaction and closes the connection; a failed commit is never reported as persisted.
+- [x] Integration tests assert the read-back PRAGMA values, a bounded lock wait against a competing writer, and rollback on an injected error.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 10 tests pass in `tests/server/integration/test_storage_connection.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full
