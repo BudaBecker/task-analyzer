@@ -1007,7 +1007,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T30: Add the systemd service asset
+### T30: Add the systemd service asset [Complete]
 
 **What**: Add the proposed systemd unit for the supervised Uvicorn process.
 **Where**: `docs/architecture/deployment/task-analyzer-server.service`
@@ -1022,10 +1022,10 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] The unit runs one Uvicorn worker on `127.0.0.1:8000` using `task_analyzer_server.app:application_factory --factory`, with no development reload, under a dedicated unprivileged `task-analyzer` account.
-- [ ] It declares a writable state directory, a read-only installed application, restart-on-failure supervision, and the approved environment variables.
-- [ ] No real host name, credential, tailnet rule, or deployment step is executed by this task; the asset is a file only.
-- [ ] Gate check passes: the Build gate is run for the phase; the asset itself is not a lint or type target.
+- [x] The unit runs one Uvicorn worker on `127.0.0.1:8000` using `task_analyzer_server.app:application_factory --factory`, with no development reload, under a dedicated unprivileged `task-analyzer` account.
+- [x] It declares a writable state directory, a read-only installed application, restart-on-failure supervision, and the approved environment variables.
+- [x] No real host name, credential, tailnet rule, or deployment step is executed by this task; the asset is a file only.
+- [x] Gate check passes: the Build gate is run for the phase; the asset itself is not a lint or type target.
 
 **Tests**: none
 **Gate**: build
