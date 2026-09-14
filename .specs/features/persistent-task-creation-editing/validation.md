@@ -1,323 +1,246 @@
 # Persistent Task Creation and Editing Validation
 
-**Date:** 2026-09-14
-**Spec:** [Approved delivery 1A specification](spec.md)
-**Design:** [Approved design and audit revision](design.md)
-**Diff range:** `127d777..5fe1955` on `feat/persistent-task-creation-editing`
-**Verifier:** independent sub-agent (author != verifier); no source or test file was modified by this validation.
-**Revision:** re-verified 2026-09-14 after fix commit `5fe1955`, which the Verifier did not author. The original pass covered `127d777..b50a9fe`.
-
 ## Validation: persistent-task-creation-editing - FAIL
 
-**Verdict: FAIL — the feature is not complete.**
+**Verdict: FAIL.** The audit reproduced four functional defects and one runtime logging defect despite passing local regression gates. Delivery 1A also remains blocked on the previously recorded target-interpreter and private-access evidence.
 
-Everything locally verifiable now passes: all five gates are green, 588 tests pass, and every injected fault is killed — no surviving mutants remain. The verdict stays FAIL for one reason only, and it is external:
+**Date:** 2026-09-14.
+**Spec:** [Approved delivery 1A specification](spec.md).
+**Design:** [Approved baseline and audit revision](design.md).
+**Diff reviewed:** `127d777..aa59004`, 56 changed files, 17,856 insertions and 276 deletions, plus the working tree's three initially untracked `__pycache__/` directories. Application and test files were unchanged by the audit.
+**Audit branch:** `docs/1a-code-audit`, initially at `aa59004`.
+**Verifier:** independent TLC Verifier sub-agent, separate from the implementation author; the root auditor supplied reproductions, which the Verifier inspected and independently reran.
+**Artifacts:** this report and script-managed lessons only; the root auditor owns the separate STATE Handoff update. No implementation/test edits, commits, remote actions, deployment, or real-database changes occurred.
 
-1. **PCE-47 (private Tailscale access) is UNMET.** It cannot be satisfied locally and no authorized-environment evidence exists.
-2. **PCE-44's target-interpreter half is UNMET.** The *declared* baseline is now pinned and discriminated by tests (see Finding 2, resolved), but the interpreter actually installed on the Ubuntu target is still unverified.
-
-This matches the Design's own instruction that "an overall PASS, Verified traceability and validate_state completion require the actual target-interpreter and private-access evidence." No local work can close either item, so FAIL is the correct verdict rather than a pessimistic one.
-
----
-
-## Task Completion
-
-All 31 tasks (T1-T31) are marked `[Complete]` in [tasks.md](tasks.md). No task is blocked or partial. T31 documents the pending external checkpoint rather than satisfying it.
-
----
-
-## Gate Check
-
-Run from the repository root with the session's development interpreter (Python 3.13.2).
-
-| Gate | Command | Exit | Result |
-| --- | --- | --- | --- |
-| Formatting | `python -m ruff format --check src/task-analyzer-server tests/server` | 0 | 40 files already formatted |
-| Lint | `python -m ruff check src/task-analyzer-server tests/server` | 0 | All checks passed |
-| Types | `python -m mypy --strict src/task-analyzer-server/task_analyzer_server` | 0 | Success: no issues found in 11 source files |
-| Tests | `python -m pytest tests/server` | 0 | **588 passed**, 0 failed, 0 skipped, 2 warnings, 57.05s |
-| Dependencies | `python -m pip check` | 0 | No broken requirements found |
-
-All five were re-run by the Verifier at `5fe1955`, not taken from the fix author's report.
-
-- **Test count before this feature:** 0 (the Design records empty source/test directories).
-- **Test count after:** 588. **Delta:** +588 (583 at `b50a9fe`, plus 5 added by the fix).
-- **Skipped tests:** none. **Failures:** none.
-- The two warnings are third-party `DeprecationWarning`s from Starlette's test client, not application defects.
-
-The `python -m build` / installed-wheel gate is exercised inside the suite itself by `tests/server/integration/test_installed_distribution.py`, which builds the wheel from a copy of the packaged sources, installs it into a fresh environment, and runs the initializer, factory and restart checks against the installed distribution only.
-
----
-
-## Spec-Anchored Acceptance Criteria
-
-Every criterion below is traced to a `file:line` and the assertion expression at that location, then judged against the outcome the specification fixes. Paths are relative to the repository root.
-
-### P1: Create a valid pending task
-
-| Criterion | Spec-defined outcome | `file:line` + assertion | Result |
-| --- | --- | --- | --- |
-| PCE-01 valid title-only creation | Pending task, no observations/deadline required | `tests/server/unit/test_domain_validation.py:74` — `issues_for(title="Read notes") == ()`; `tests/server/integration/test_services_create.py:181` — title-only creation yields a pending task | PASS |
-| PCE-02 empty/whitespace title rejected | Rejection | `tests/server/unit/test_domain_validation.py:84` — `issues_for(title="") == (REQUIRED_TITLE,)`; `:89` `title="     "`; `:110` parametrized over `\t`, `\n`, `\r\n`, NBSP, EM SPACE | PASS |
-| PCE-03 exactly 200 chars after trimming accepted | Accept | `tests/server/unit/test_domain_validation.py:119` — `issues_for(title="a" * 200) == ()`; `:155` `f"   {'a' * 200}   "` accepted after trimming | PASS |
-| PCE-04 over 200 after trimming rejected | Reject | `tests/server/unit/test_domain_validation.py:124` — `issues_for(title="a" * 201) == (TOO_LONG_TITLE,)`; `:160` edge spaces do not rescue 201 | PASS |
-| PCE-05 exactly 5,000 observations accepted | Accept | `tests/server/unit/test_domain_validation.py:178` — `issues_for(observations="a" * 5000) == ()` | PASS |
-| PCE-06 over 5,000 observations rejected | Reject | `tests/server/unit/test_domain_validation.py:183` — `issues_for(observations="a" * 5001) == (TOO_LONG_OBSERVATIONS,)` | PASS |
-| PCE-07 line breaks retained | Observations keep line breaks | `tests/server/integration/test_services_create.py:217` — `stored_tasks(settings)[0].observations == "First line\nSecond line\n\nFourth line"`; `tests/server/unit/test_contracts_input.py:70` | PASS |
-| PCE-08 valid in-range deadline retained | Calendar date retained | `tests/server/integration/test_services_create.py:206` — `stored[0].deadline == date(2026, 9, 14)` | PASS |
-| PCE-09 past deadline accepted | Accept | `tests/server/integration/test_services_create.py:226` — `result.outcome == "succeeded"` and `stored_tasks(settings)[0].deadline == date(2020, 1, 31)` | PASS |
-| PCE-10 non-calendar deadline rejected | Reject | `tests/server/unit/test_domain_validation.py:277` — parametrized invalid dates yield `(INVALID_DEADLINE,)`; `:298` non-`YYYY-MM-DD` spellings; `:309` non-ASCII digits | PASS |
-| PCE-48 user-perceived character counting | Grapheme clusters, not code points | `tests/server/unit/test_domain_validation.py:130-133` — `title = COMBINING_E * 200`, `assert len(title) == 400`, `issues_for(title=title) == ()`; `:143-146` `JOINED_FAMILY * 200`, `assert len(title) == 1400`, accepted; `:137` and `:150` reject at 201 | PASS |
-| PCE-51 `0001-01-01` and `9999-12-30` accepted | Accept both endpoints | `tests/server/unit/test_domain_validation.py:248` / `:253`; `tests/server/integration/test_services_create.py:236` — `stored_tasks(settings)[0].deadline == date(1, 1, 1)`; `:246` — `== date(9999, 12, 30)` | PASS |
-| PCE-52 outside range rejected, state unchanged | Reject as `INVALID_DEADLINE`, no state change | `tests/server/unit/test_domain_validation.py:258` — `issues_for(deadline="9999-12-31") == (INVALID_DEADLINE,)`; `:262` below-range; `tests/server/integration/test_services_edit.py:644-648` — `result.error.fields == (INVALID_DEADLINE,)` and `stored_columns(settings, task_id) == before` | PASS |
-
-The 200/201 and 5,000/5,001 pairs are preserved exactly, in plain, combining-mark and joined-emoji forms. The combining and emoji fixtures assert the code-point length alongside acceptance, which is what makes them discriminate a code-point counter.
-
-### P1: Edit a pending task without losing identity or valid state
-
-| Criterion | Spec-defined outcome | `file:line` + assertion | Result |
-| --- | --- | --- | --- |
-| PCE-11 valid edit persists title/observations/deadline | All three persisted | `tests/server/integration/test_services_edit.py:296` — every editable field persisted; `:319` whole editable state replaced | PASS |
-| PCE-12 identity preserved | Same `task_id` | `tests/server/integration/test_services_edit.py:375` — `result.task.task_id == task_id` | PASS |
-| PCE-13 original creation time preserved | `created_at` unchanged | `tests/server/integration/test_services_edit.py:376` — `result.task.created_at == before.created_at`; `:390` — `stored.created_at == SERVER_NOW` after editing under a later clock | PASS |
-| PCE-14 pending status retained | `status == "pending"` | `tests/server/integration/test_services_edit.py:377-378` — `result.task.status == "pending"` and `result.task.completed_at is None` | PASS |
-| PCE-15 invalid edit rejected, state unchanged | Reject; whole task unchanged | `tests/server/integration/test_services_edit.py:485` (invalid title) and `:501` (invalid deadline), each comparing full `stored_columns` before/after; `tests/server/unit/test_domain_validation.py:334` | PASS |
-| PCE-16 removing optional values persists absence | Absence persisted | `tests/server/integration/test_services_edit.py:333` (observations cleared) and `:347` (deadline cleared) | PASS |
-
-### P1: Enforce task uniqueness
-
-| Criterion | Spec-defined outcome | `file:line` + assertion | Result |
-| --- | --- | --- | --- |
-| PCE-17 case/space-insensitive comparison | `Read notes` equals ` READ  NOTES ` | `tests/server/unit/test_domain_title_key.py:26` — `title_key("Read notes") == title_key(" READ  NOTES ")`; `:101-103` pins the literal key `"read notes"` | PASS |
-| PCE-18 accents preserved | `Review résumé` differs from `Review resume` | `tests/server/unit/test_domain_title_key.py:31` — `title_key(ACCENTED_TITLE) != title_key(PLAIN_TITLE)`; `:55` — `title_key("Résumé") == "résumé"` | PASS |
-| PCE-19 dated conflict rejected, any status | Reject; population ignores pending/completed | `tests/server/integration/test_services_uniqueness.py:340` (pending); `:402` — conflicts with a **completed** dated fixture, `result.error.conflicting_task_id == completed` | PASS |
-| PCE-20 undated pending conflict rejected | Reject | `tests/server/integration/test_services_uniqueness.py:474-477` — `result.error.code == ErrorCode.TASK_UNIQUENESS_CONFLICT` and `conflicting_task_id == existing` | PASS |
-| PCE-21 equivalent titles, different dates coexist | Permit | `tests/server/integration/test_services_uniqueness.py:425-426` — `result.outcome == "succeeded"`, `len(stored_tasks(settings)) == 2` | PASS |
-| PCE-22 undated and dated coexist | Permit | `tests/server/integration/test_services_uniqueness.py:437` and `:449` — both directions succeed with two stored tasks | PASS |
-| PCE-23 self-exclusion on edit | Task excluded from its own comparison | `tests/server/integration/test_services_uniqueness.py:578` (same combination) and `:591` (equivalent respelling) — both succeed | PASS |
-| PCE-24 deleted tasks excluded | Deleted never block | `tests/server/integration/test_services_uniqueness.py:492` (dated), `:503` (undated), `:661` (on editing) — all succeed | PASS |
-| PCE-25 completed undated excluded | Completing an undated task frees its title | `tests/server/integration/test_services_uniqueness.py:487` — succeeds against a completed undated fixture; `:647` on editing | PASS |
-| PCE-26 rejection identifies the conflict | Conflict named in the result | `tests/server/integration/test_api_operations.py:266-273` — `error.code == TASK_UNIQUENESS_CONFLICT`, `original_http_status == 409`, `error.conflicting_task_id == original["task"]["task_id"]` | PASS |
-| PCE-27 both tasks unchanged on conflict | Neither task modified | `tests/server/integration/test_services_uniqueness.py:379` (creation leaves the conflicting task untouched), `:391` (no task created), `:563` (edit leaves both, compared by full `stored_columns`) | PASS |
-
-Both protected title examples are asserted verbatim, and the two uniqueness populations are exercised separately against pending, completed and deleted fixtures in both the dated and undated directions.
-
-### P1: Retain authoritative task state and product time
-
-| Criterion | Spec-defined outcome | `file:line` + assertion | Result |
-| --- | --- | --- | --- |
-| PCE-28 creation time from the server clock | Server instant at application | `tests/server/integration/test_services_create.py:448-449` — `result.task.created_at == SERVER_NOW` and the stored row matches | PASS |
-| PCE-29 configured zone retained | Zone fixed on first setup | `tests/server/integration/test_services_configuration.py:140-142` — `view.configured is True`, `product_time_zone == PRODUCT_ZONE`, `retained_zone(settings) == PRODUCT_ZONE` | PASS |
-| PCE-30 product date from server time in retained zone | Date derived in the retained zone | `tests/server/integration/test_services_configuration.py:151-152` — `view.server_now == SERVER_NOW`, `product_date == PRODUCT_DATE_IN_SAO_PAULO`; `:161` a different zone gives a different date from the same instant | PASS |
-| PCE-31 desktop clock/zone changes do not move interpretation | Server-based rules preserved | `tests/server/integration/test_services_configuration.py:239-240` — a clock in another zone yields the same `server_now` and `product_date`; `:250` a moved desktop cannot replace the zone | PASS |
-| PCE-32 cutoff is midnight immediately after the date | 2026-09-14 → 2026-09-15 00:00 product zone | `tests/server/unit/test_clock_cutoff.py:71-74` — `cutoff == datetime(2026, 9, 15, 3, 0, tzinfo=UTC)` and its Sao Paulo reading is `2026-09-15 00:00` | PASS |
-| PCE-33 overdue once the cutoff is reached | Valid through Sept 14; overdue at Sept 15 00:00, no grace | `tests/server/unit/test_clock_cutoff.py:81` — `last_moment < deadline_cutoff(...)` for `23:59:59.999999`; `:89-90` — `midnight == cutoff` and `midnight >= cutoff` | PASS |
-| PCE-34 accepted state survives restart | State retained | `tests/server/integration/test_durability.py:349-350` and `:368` — `survivor == created.json()["task"]`, across a genuinely new server process | PASS |
-| PCE-35 configured zone survives restart | Zone retained | `tests/server/integration/test_durability.py:417-418` — `configuration["configured"] is True`, `product_time_zone == PRODUCT_ZONE` after restart | PASS |
-| PCE-36 persisted tasks available to a fresh session | State readable by a new session | `tests/server/integration/test_durability.py:465-469` — new session reads the task list with no carried cookie/session state | PASS |
-| PCE-49 repeated midnight uses the FIRST occurrence | Earlier UTC instant | `tests/server/unit/test_clock_cutoff.py:118-119` — `cutoff == datetime(2026, 11, 1, 4, 0, tzinfo=UTC)` and `cutoff < datetime(2026, 11, 1, 5, 0, tzinfo=UTC)`; `:129-130` confirms both instants read as the same local midnight | PASS |
-| PCE-50 missing midnight uses first valid instant at/after the boundary | Apia `2011-12-29` → `2011-12-30T10:00:00.000000Z` | `tests/server/unit/test_clock_cutoff.py:154-155` — `cutoff == datetime(2011, 12, 30, 10, 0, tzinfo=UTC)` and its Apia reading is `2011-12-31 00:00`; `:137` Havana; `:147` Sao Paulo 2018 | PASS |
-
-**Oracle independence confirmed.** Every expected instant in `test_clock_cutoff.py` is a literal `datetime` constant read from IANA zone-transition data (fixtures at `:40-64`, documented at `:5-19`). No expected value is produced by calling `deadline_cutoff`. The `Pacific/Apia` oracle is exactly the approved `2011-12-30T10:00:00Z`. `:192` additionally re-derives the boundary independently from `deadline + 1 day` and checks that the preceding microsecond falls short, across all 13 fixtures including both supported date endpoints in UTC, `+14:00` and `-11:00`.
-
-### P1: Recover original operation results without duplicate application
-
-| Criterion | Spec-defined outcome | `file:line` + assertion | Result |
-| --- | --- | --- | --- |
-| PCE-37 success only after persistence | Confirmed only once committed | `tests/server/integration/test_services_create.py:489-491` — reported task equals the stored task and the retained result; `tests/server/integration/test_services_runner.py:497-504` — a failed COMMIT raises and leaves **no** retained outcome and **no** task | PASS |
-| PCE-38 consulted outcome returned | The operation's own outcome | `tests/server/integration/test_services_runner.py:518` — `lookup_operation(...) == original`; `tests/server/integration/test_api_operations.py:194-196` — consulted snapshot matches field for field | PASS |
-| PCE-39 repetition prevents duplicate application | Applied once only | `tests/server/integration/test_services_runner.py:355-357` — `repeated == original`, **`command.runs == 1`**, one task stored; `tests/server/integration/test_services_create.py:503` — `len(stored_tasks(settings)) == 1` | PASS |
-| PCE-40 lost response: original outcome available | Original persisted outcome on consultation | `tests/server/integration/test_api_operations.py:193-196` — consulted result carries the created task with `created_at == "2026-09-14T12:00:00.123456Z"`; `tests/server/integration/test_durability.py:472` — consultable after a restart | PASS |
-| PCE-41 original uniqueness rejection returned | Same rejection on consultation | `tests/server/integration/test_services_uniqueness.py:514`; `:751` — the retained rejection survives even after the conflict is freed | PASS |
-| PCE-42 different conflicting operation rejected, not replayed | Reject the conflict; do not report the earlier success | `tests/server/integration/test_services_uniqueness.py:539-544` — `refused.outcome == "rejected"`, `refused.operation_id == second.operation_id`, code `TASK_UNIQUENESS_CONFLICT`, `len(stored_tasks(settings)) == 1` | PASS |
-| PCE-43 rejection distinguishable from unknown | Unknown is not a rejection | `tests/server/integration/test_api_operations.py:281-285` — unknown is `404` with `OPERATION_RESULT_UNKNOWN`; `:293-295` — carries no terminal `outcome`; contrasted with `:234` where a stored rejection is `200` with `outcome == "rejected"`; `:250-252` — a `200` consultation of a rejection persisted no task | PASS |
-
-### P1: Serve the private personal collection within approved constraints
-
-| Criterion | Spec-defined outcome | `file:line` + assertion | Result |
-| --- | --- | --- | --- |
-| PCE-44 Python 3.13 or later | Runtime baseline is >= 3.13 | `pyproject.toml:9` — `requires-python = ">=3.13"`, now pinned by `tests/server/unit/test_packaging_metadata.py:46` — `declared_floor() == (3, 13)`; `:51` — `(3, 12) < declared_floor()`; `:56` — `(3, 11) < declared_floor()`; `:61` — `not (3, 13) < declared_floor()`; `:68` — `metadata["project"]["requires-python"] == ">=3.13"`. Local half covered and discriminated. **Target interpreter still unverified** — see Finding 3. | PARTIAL (local half PASS) |
-| PCE-45 dedicated self-hosting supported | Explicit paths, installed distribution, no implicit fallback | `tests/server/integration/test_durability.py:519-521` — a configured runtime path cannot become a test's database and `not Path("C:/runtime/production.db").exists()`; `tests/server/integration/test_installed_distribution.py:465` (installed initializer creates a disposable database), `:503` (persisted state survives restarting the installed server), `:523` (absent database fails without creating one) | PASS |
-| PCE-46 one collection, no product accounts/authentication | Served without sign-in; forwarded identity is not an account | `tests/server/integration/test_api_app.py:380` — `response.status_code == 200` with no credential; `:395-396` — `forwarded.status_code == anonymous.status_code` and `forwarded.json() == anonymous.json()` for `Authorization`, `X-Forwarded-User` and `Tailscale-User-Login` headers | PASS (local half) |
-| PCE-47 private access through Tailscale | Private tailnet path verified | **No local evidence exists and none is possible.** No test in scope exercises a tailnet path; `docs/architecture/deployment/server.md` and the systemd asset are documentation, which the Design states cannot satisfy PCE-47. | **UNMET** |
-
-**Status: 51 of 52 criteria are fully satisfied within the locally verifiable scope. 0 spec-precision gaps. PCE-44's declared baseline is now covered and discriminated, while its target-interpreter half stays externally unverified. PCE-47 is UNMET and externally blocked.**
-
----
-
-## Discrimination Sensor
-
-**Isolation method.** All mutations ran in temporary `git worktree` scratches under the session scratchpad (`git worktree add <scratch> HEAD`), removed with `git worktree remove --force` afterwards. `git stash` was never used. The real working tree was never mutated.
-
-- **Pre-sensor baseline** (`git status --porcelain`): three untracked `__pycache__/` directories (plus this report, on the re-verification pass).
-- **Post-sensor** (`git status --porcelain`): identical each time, `pyproject.toml` intact, `git worktree list` back to the single real tree. `HEAD` was `b50a9fe` for pass 1 and `5fe1955` for pass 2.
-
-**Methodological correction — the first sensor run was void.** An initial pass reported all 10 mutations surviving with identical pass counts. The cause was that the development environment installs the package in editable mode through `__editable__.task_analyzer_server-0.1.0.pth`, whose single path entry points at the **real repository**. Tests executed inside the worktree therefore imported the unmutated real source, and the mutations were never exercised. The run was discarded and repeated with `PYTHONPATH` set to the worktree's package root, plus two guards: a provenance check asserting the imported `task_analyzer_server.__file__` resolves inside the worktree, and an unmutated baseline run of the full suite in the worktree (583 passed, exit 0). Only the guarded results below are reported. A worktree-based sensor on this repository is invalid without that override.
-
-**Sensor depth:** P0-full (data integrity, durability and time semantics are critical paths).
-
-### Pass 1 — at `b50a9fe`
-
-| # | File | Mutation | Tests run | Killed? |
-| --- | --- | --- | --- | --- |
-| M1 | `domain.py:201` | Grapheme counter iterates code points instead of `\X` clusters | `test_domain_validation.py` | Killed (4 failed) |
-| M2 | `domain.py:91` | Title key skips internal-space collapsing | `test_domain_title_key.py`, `test_services_uniqueness.py` | Killed (19 failed) |
-| M3 | `domain.py:92` | Title key strips accents (NFD + drop combining marks) | `test_domain_title_key.py`, `test_services_uniqueness.py` | Killed (4 failed) |
-| M4 | `clock.py:148` | Repeated midnight resolves to the **later** occurrence (`min` → `max`) | `test_clock_cutoff.py` | Killed (4 failed) |
-| M5 | `clock.py:140` | Cutoff computed as deadline start **+ 24 hours** instead of next-day midnight | `test_clock_cutoff.py` | Killed (1 failed) |
-| M6 | `domain.py:43` | Deadline upper bound accepts `9999-12-31` | `test_domain_validation.py`, `test_services_create.py`, `test_services_edit.py` | Killed (3 failed) |
-| M7 | `storage.py:100` | Dated uniqueness predicate drops the `is_deleted = 0` condition | `test_services_uniqueness.py` | Killed (2 failed) |
-| M8 | `storage.py:106` | Undated uniqueness predicate drops the `status = 'pending'` condition | `test_services_uniqueness.py` | Killed (2 failed) |
-| M9 | `services.py:759` | Ledger replay **reapplies** the command instead of returning the stored result | `test_services_runner.py`, `test_services_edit.py` | Killed (4 failed) |
-| M10 | `storage.py:247` | Commit ordering: terminal result returned with a rollback instead of `COMMIT` | `test_services_runner.py`, `test_services_create.py` | Killed (39 failed) |
-| M11 | `pyproject.toml:9` | Runtime baseline lowered from `>=3.13` to `>=3.9` | full `tests/server` suite | **SURVIVED** (583 passed) |
-
-Pass 1 result: 10 of 11 killed. Every mutation the brief named as a minimum target was injected and killed. The suite discriminates grapheme counting, accent retention, space collapsing, both exceptional-midnight rules, the deadline range bound, both uniqueness populations, ledger replay semantics and commit ordering. The lone survivor was M11.
-
-### Pass 2 — re-verification at `5fe1955`
-
-Fix commit `5fe1955` adds `tests/server/unit/test_packaging_metadata.py` (5 tests, standard library only; no source or existing test was touched). M11 was re-injected independently by the Verifier in a fresh worktree, under the same provenance discipline, in two lowering variants. Unmutated baseline in that worktree: 588 passed, exit 0.
-
-| # | File | Mutation | Tests run | Killed? |
-| --- | --- | --- | --- | --- |
-| M11a | `pyproject.toml:9` | Baseline lowered `>=3.13` → `>=3.9` | full `tests/server` suite | **Killed** (4 failed, 584 passed) |
-| M11b | `pyproject.toml:9` | Baseline lowered `>=3.13` → `>=3.12` (subtler, one minor version) | full `tests/server` suite | **Killed** (3 failed, 585 passed) |
-
-Per-test breakdown, independently reproduced rather than taken from the fix author's report:
-
-| Variant | `..._is_the_approved_minimum` | `..._excludes_the_preceding_version` | `..._excludes_the_superseded_minimum` | `..._admits_the_approved_minimum` | `..._written_as_the_approved_specifier` |
-| --- | --- | --- | --- | --- | --- |
-| `>=3.9` | FAIL | FAIL | FAIL | **PASS** | FAIL |
-| `>=3.12` | FAIL | FAIL | PASS | PASS | FAIL |
-| `>=3.13` (unmutated) | PASS | PASS | PASS | PASS | PASS |
-
-This confirms the fix author's specific claim: on `>=3.9`, exactly 4 of the 5 tests fail and `test_the_declared_floor_admits_the_approved_minimum` correctly still passes, because that test guards the *upper* bound — it catches a floor raised above the approved minimum, not one lowered below it. Its passing on `>=3.9` is correct behavior, not a weak assertion.
-
-**Overall sensor result across both passes: 12 distinct behavior-level mutations judged, 12 killed, 0 survived.**
-
-### Adequacy probes on the new tests (characterization, not regressions)
-
-Three further variants were injected to judge the new tests rather than the implementation:
-
-| Variant | Outcome | Reading |
-| --- | --- | --- |
-| `>=3.14` (floor raised) | 3 of 5 fail, incl. `..._admits_the_approved_minimum` | Test 4 earns its place: it is the only guard against drifting *above* the approved decision |
-| `>3.13` (excludes 3.13 itself) | All 5 fail | Correct: `>3.13` would exclude the approved minimum; the helper's `startswith(">=")` guard trips first |
-| `>=3.13.0` (same floor, different spelling) | Only `..._written_as_the_approved_specifier` fails | The one assertion that can fail without a semantic regression — see the adequacy note in Finding 2 |
-
----
-
-## Edge Cases
-
-- [x] Blank input and exact bounds — 200/201 and 5,000/5,001 preserved in plain, combining and emoji forms (`test_domain_validation.py:119-209`).
-- [x] Space normalization versus task identity — equivalence is comparison-only; identity is a server UUID and survives a title change (`test_domain_title_key.py:96`, `test_services_edit.py:375`).
-- [x] Partial edit with invalid data or conflict — whole persisted task compared before and after (`test_services_edit.py:485`, `test_services_uniqueness.py:563`).
-- [x] Competing conflicting creations or edits — `tests/server/integration/test_concurrency.py` exercises overlapping writes on independent connections with explicit synchronization; at most one conflicting state is accepted.
-- [x] Lost response or overlapping repeated attempts — persisted state and original outcome inspected, not merely response receipt (`test_services_runner.py:339-357`, `test_api_operations.py`).
-- [x] Cutoff boundary — September 14/15 00:00 preserved with no grace period (`test_clock_cutoff.py:77-90`).
-- [x] Existing completed or deleted comparison candidates — isolated fixtures used, as 1A requires (`test_services_uniqueness.py:402, 479, 492`).
-- [x] Unknown lookup distinct from rejection — `404 OPERATION_RESULT_UNKNOWN` versus a `200` stored rejection (`test_api_operations.py:281, 234`).
-
----
-
-## Code Quality
-
-| Check | Status |
-| --- | --- |
-| No features beyond what was asked | Pass — no lifecycle, metrics or emphasis code; 1A writes pending tasks only |
-| No abstractions for single-use code | Pass — no ORM, repository layer, broker or job queue, as the Design requires |
-| No unnecessary flexibility added | Pass — `Clock` is the only substitution point |
-| Only touched files required for the tasks | Pass — changes confined to the approved module list and supporting locations |
-| Didn't improve unrelated code | Pass |
-| Matches existing patterns/style | Pass — Ruff (79-col, Google docstrings) and mypy strict both clean |
-| Tests map to acceptance criteria and are non-shallow | Pass — assertions target stored state and published contract values, not internal calls |
-| Spec-anchored outcome check | Pass for 50 criteria; PCE-44 partial, PCE-47 unmet |
-| Per-layer coverage expectation | Pass — domain rules map 1:1 to criteria; every `/v1` route has happy, edge and error coverage |
-| Every test maps to a spec requirement | Pass — each module header records its PCE and REQ IDs |
-| Documented guidelines followed | Pass — `AGENTS.md` (Python 3.13+, annotations, Google docstrings, isolated disposable test databases) and the 1A Design gates |
-
-Traceability is recorded per module rather than per test function. That is adequate for review but means a single criterion's evidence must be located by reading the module, which is why this report cites line-level assertions.
-
-Tests use newly allocated temporary directories and disposable databases, and `test_durability.py:505` proves a configured runtime path cannot be reached by a test. No real database was touched by this validation.
-
----
+The independent Verifier completed its review, reproductions, gates, sensor and report draft before its session ran out of credits. The root auditor finalized citation corrections, lesson recording and the completion-gate check.
 
 ## Findings
 
-### Finding 1 — PCE-47 private Tailscale access is UNMET (Blocker, external)
+### F1: Concurrent initialization can delete the successfully initialized database (P1)
 
-- **What:** No evidence exists that the server is reachable only through the private tailnet. `tests/server/integration/test_api_app.py` verifies the *absence of a product sign-in* (PCE-46), which is genuinely local, but no test exercises a Tailscale path. `docs/architecture/deployment/server.md` and `docs/architecture/deployment/task-analyzer-server.service` describe the intended setup; the Design states plainly that documentation alone cannot satisfy PCE-47.
-- **Why it cannot be closed here:** The target is the user's own Ubuntu server. Establishing the tailnet hostname, HTTPS availability and authorized device access requires an explicitly authorized deployment session, which has not occurred.
-- **Resolution:** Not a code defect and not fixable locally. It requires an authorized session on the target host, recording service startup/restart, configuration retention and access from an authorized desktop through Tailscale.
+**Evidence:** `src/task-analyzer-server/task_analyzer_server/schema.py:54` checks existence before connecting, while `schema.py:66` handles a later SQLite failure by deleting the path. Two invocations can both observe an absent path. The first initializes successfully; the second opens that same database, fails on `CREATE TABLE`, and deletes the first invocation's database. The cleanup does not establish ownership of the file.
 
-### Finding 2 — PCE-44's declared baseline was not test-discriminated — **RESOLVED 2026-09-14**
+**Reproduction:** allocate one new file path inside a temporary directory; use two threads and a barrier inside the existing `read_initial_schema` call so both pass the real existence check; pause the second until the first initializer returns, then resume it. Both execute the unchanged initializer and real SQLite operations. Observed output:
 
-- **Original defect:** `pyproject.toml:9` declared `requires-python = ">=3.13"` correctly, but no test asserted that value. Mutation M11 lowered it to `>=3.9` and the entire 583-test suite still passed, because the session interpreter is 3.13.2 and `Requires-Python` only bites when installing on an older interpreter. A future edit reversing the baseline the user raised from 3.11 on 2026-09-13 would have passed every gate unnoticed.
-- **Fix:** Commit `5fe1955`, authored by an implementer and verified here, adds `tests/server/unit/test_packaging_metadata.py` — 5 tests, standard library only, parsing `requires-python` with `tomllib`.
-- **Verification:** Re-injected M11 in two lowering variants in an isolated worktree; both killed (M11a, M11b above). The mutant that previously survived a full-suite run now fails it.
-- **Adequacy judgment — accepted, with one note.** Each test maps to PCE-44/REQ-003 and none is shallow:
-  - `:46` pins the parsed floor exactly; `:51` and `:56` encode the excluded versions explicitly, including the superseded 3.11 the user moved away from; `:61` guards the opposite direction (a floor raised above the approved minimum) and is the only test that does so; `:68` pins the literal specifier spelling.
-  - `:51` and `:56` are logically implied by `:46`, so they are mild redundancy rather than independent coverage. At this cost they read as intent documentation and are not worth rejecting.
-  - `:68` is the one assertion that can fail without a semantic regression: `>=3.13.0` denotes the same floor but fails it. That is defensible — the specifier is an approved value and any edit to it should be deliberate — but it is a spelling pin, not a semantic one, and should be understood as such rather than as a second check of the floor.
-  - Avoiding `packaging` is correct: it is a transitive dependency in the locked environment, not a declared one, so depending on it would have introduced an undeclared test dependency contrary to AGENTS.md.
-  - **Scope limitation (accepted, not a defect):** all five read the checkout's `pyproject.toml`, not the built wheel's `Requires-Python` metadata. In practice these agree, because `test_installed_distribution.py` builds from a copy of the same file. The tests therefore pin the *declaration*; they do not and cannot pin the interpreter on the deployment target.
-- **Residual:** none locally. The target-interpreter half of PCE-44 moves to Finding 3.
+```text
+winner: initialized; exists=True
+loser: OperationalError: table schema_version already exists
+database_exists_after_both_attempts=False
+```
 
-### Finding 3 — PCE-44's target interpreter is unverified (Blocker, external)
+The losing invocation can therefore remove a database that another successful invocation has already made available. This violates T6's refusal to overwrite/reinitialize existing state and the database preservation rules; it jeopardizes REQ-010/PCE-34 persistence if the winner starts serving work before the loser resumes. Existing initializer tests exercise an already-existing file, but miss concurrent ownership.
 
-- **What:** The declared baseline is now pinned, but no evidence exists of the interpreter version set actually installed on the Ubuntu Server 26.04.1 LTS target. AD-003's host-compatibility prerequisite and the Design's target-lock requirement are both still open.
-- **Why it cannot be closed here:** The local lock was resolved on Windows against Python 3.13.2. The Design states explicitly that a local lock does not establish target compatibility.
-- **Resolution:** Requires the same authorized deployment session as Finding 1 — confirm the target interpreter, produce and validate the target-specific lock, and run the gates on that environment.
+**Proposed fix task:** atomically acquire exclusive ownership of a new database path, and delete a failed partial initialization only when it belongs to that invocation. Change `schema.py` and add isolated concurrency regressions in `test_schema_init.py`. **Done when:** two synchronized initializers leave exactly one successful, readable schema; the loser cannot remove or alter it, including a row committed after the winner returns; existing-file refusal and failure cleanup remain intact. **Gate:** the full Build gate. Scope requires approval before implementation.
 
-### Observation — the worktree sensor needs a PYTHONPATH override (process, no code change)
+### F2: SQLite work blocks the application's event loop (P2)
 
-The editable install pins imports to the real checkout, so any mutation-based verification run from a scratch worktree silently tests the unmutated source unless `PYTHONPATH` points at the worktree package root. This produced a false all-survived result on the first attempt. Any future re-verification must keep the provenance guard described in the Sensor section.
+**Evidence:** async handlers directly invoke synchronous services at `src/task-analyzer-server/task_analyzer_server/api.py:151`, `api.py:183`, and `api.py:217`. The services open SQLite connections, execute `BEGIN IMMEDIATE`, and may wait for the configured busy timeout on the event-loop thread. The approved design assigns blocking database work to a synchronous worker invocation and deploys one Uvicorn worker.
 
----
+**Reproduction:** hold `BEGIN IMMEDIATE` on a separate connection to a disposable configured database; set the application busy timeout to 300 ms; schedule an event-loop callback for 20 ms and submit an ASGI POST. The POST returns `503`; the 20 ms callback executes only after **396 ms** in the Verifier's run. No service delay was mocked. With the approved default 5,000 ms timeout, one waiting write can prevent unrelated requests, including result consultation, from being dispatched during that interval.
 
-## Requirement Traceability Update
+**Proposed fix task:** await request parsing and move each complete synchronous service invocation to the framework's worker thread facility, keeping connection open/use/close together. Change `api.py` and the HTTP concurrency tests. **Done when:** a blocked POST/PUT/configuration write returns the existing infrastructure contract after its timeout while another HTTP read or event-loop probe completes before that timeout; same-attempt and uniqueness concurrency remain correct. **Gate:** the full Build gate. Trace: T22-T26/T29, the Design connection-ownership rule, PCE-38/PCE-43 and REQ-031.
 
-Proposed statuses. Nothing is marked `Verified`, because the Design conditions `Verified` traceability on the external evidence that remains outstanding.
+### F3: Invalid JSON numbers escape validation as internal errors (P2)
 
-| Requirement | Previous | Proposed | Basis |
+**Evidence:** `src/task-analyzer-server/task_analyzer_server/api.py:371` uses permissive `json.loads`. `services.py:805` later canonicalizes with `allow_nan=False` outside the business validation flow. `NaN`/`Infinity` are accepted by that parser; the valid JSON numeric spelling `1e309` becomes infinity in a Python float. Canonicalization then raises `ValueError`, mapped to `500 INTERNAL_ERROR` instead of the approved protocol/validation result.
+
+**Reproduction:** after configuring a disposable application, POST each body with a fresh valid Operation-Id:
+
+```text
+{"title":NaN}                       -> 500 INTERNAL_ERROR; lookup 404
+{"title":1e309}                     -> 500 INTERNAL_ERROR; lookup 404
+{"title":"ok","deadline":Infinity} -> 500 INTERNAL_ERROR; lookup 404
+```
+
+The Design explicitly rejects invalid JSON numbers. Non-JSON constants belong to `400 INVALID_OPERATION_ENVELOPE` without a terminal result; a syntactically valid JSON number in a string-only task field belongs to the durable `422 TASK_VALIDATION_FAILED` / `INVALID_FIELD_TYPE` flow. The current response instead leaves the client with an unknown operation. Existing malformed-JSON and strict-field tests omit these parser/canonicalization cases. A lone escaped surrogate also produced 500 during exploratory probing; it is not an additional approved text restriction or a separate finding here.
+
+**Proposed fix task:** reject non-JSON constants at the HTTP boundary and ensure supported parsed JSON numbers cannot fail canonicalization before the durable field-validation flow. Change `api.py` and, if necessary, canonicalization in `services.py`, with creation/editing HTTP regressions. **Done when:** NaN and both infinities produce the specified protocol response and no ledger entry; valid numeric wrong-type values, including the overflow example, produce an exactly consultable durable rejection; no task changes occur, and replay identity semantics remain intact. **Gate:** the full Build gate. Trace: T11/T22/T25/T26, the Design Values and responses/error contracts, REQ-007/008/031 and PCE-15.
+
+### F4: Task-list metadata and items are read from different snapshots (P2)
+
+**Evidence:** `src/task-analyzer-server/task_analyzer_server/services.py:393` reads the configured zone and `services.py:394` reads tasks without a read transaction. Connections run in autocommit, so the SELECTs need not observe the same committed state, contrary to the Design and the function's own contract.
+
+**Reproduction:** initialize an unset disposable database. Pause a list reader immediately after its real zone SELECT returns `None`. On another connection perform real zone setup to UTC and create a task; then resume the reader's real task SELECT. Observed response values:
+
+```text
+items=1
+product_time_zone=None
+product_date=None
+```
+
+No committed state ever contained that combination: task creation requires configured product time. This is an initial-setup overlap, not a claim that the fixed zone can later change.
+
+**Proposed fix task:** enclose the configuration and task reads in one explicit read transaction, with normal rollback/close handling and one sampled server instant. Change `services.py`/the appropriate storage helper and `test_api_tasks_read.py`. **Done when:** the synchronized scenario returns either the complete pre-setup empty view or the complete post-setup configured view, never mixed metadata/items; ordinary reads remain fresh and `Cache-Control: no-store`. **Gate:** the full Build gate. Trace: T24, Design committed-snapshot contract, PCE-30/PCE-36 and REQ-010/028.
+
+### F5: The documented Uvicorn launch still emits non-JSON logs (P3)
+
+**Evidence:** `src/task-analyzer-server/task_analyzer_server/logging_config.py:93` through `logging_config.py:99` configure only the root logger. Uvicorn's default logging configuration installs its own handler with propagation disabled. The service asset uses that default configuration. Application root logs are structured, but the runtime output is a mixture of JSON and plain text despite the Design/deployment JSON-line claim.
+
+**Reproduction:** construct `uvicorn.Config('task_analyzer_server.app:application_factory', factory=True)`, call the real `configure_logging('INFO')`, capture the existing Uvicorn handler stream, and log `uvicorn.error.info('Application startup complete.')`. The Verifier independently observed:
+
+```text
+UVICORN_LOG 'INFO:     Application startup complete.\n'
+JSON_VALID False
+UVICORN_PROPAGATE False
+```
+
+**Proposed fix task:** apply the approved logging configuration to the actual runtime logger hierarchy/launch path, avoiding duplicate handlers. Cover real Uvicorn configuration rather than only standalone formatter calls. **Done when:** application, access, startup, and error records in the documented launch path are JSON lines with the applicable schema and no task bodies/text or secrets. **Gate:** full Build and an installed-runtime logging smoke check. Trace: T4/T22/T30, Design Runtime, Private Access, and Logging; no new product observability feature is proposed.
+
+### External completion gaps remain open
+
+- **PCE-44 / REQ-003:** the Python 3.13 declaration and local interpreter are verified; the actual Ubuntu target interpreter and its target-specific lock/gates remain unverified.
+- **PCE-47 / REQ-027:** no authorized private Tailscale path has been exercised. The guide and local absence of product sign-in cannot establish private reachability.
+
+These were already open before this audit. They are independent of F1-F5 and need the separately authorized host session. No host or real database was touched.
+
+## Task completion and approval boundary
+
+All 31 original tasks are marked Complete in [tasks.md](tasks.md). Those task labels report implementation history, not proof that all Done-when branches hold. F1-F5 are new, concrete local gaps against that approved scope. They replace the previous report's conclusion that no local work remains. Fix proposals above are reviewable audit output; this audit does not execute them or change task/spec approval records.
+
+## Gate check
+
+The PATH interpreter lacked pytest, Ruff, and mypy. Those initial invocations were unavailable-environment results, not code failures. A fresh temporary CPython **3.13.2** development environment was then installed from `requirements/dev-py313.txt` using `--require-hashes` (exit 0); no dependency was upgraded or added. Source-suite imports used the repository package root through PYTHONPATH; installed-wheel checks explicitly removed that fallback.
+
+| Gate | Actual command | Exit | Evidence |
 | --- | --- | --- | --- |
-| REQ-007 | In Execute | Locally verified | PCE-01 to PCE-10, PCE-11, PCE-14 to PCE-16, PCE-48, PCE-51, PCE-52 all matched |
-| REQ-008 | In Execute | Locally verified | PCE-01, PCE-11, PCE-12, PCE-14 to PCE-16, PCE-27, PCE-52 all matched |
-| REQ-010 | In Execute | Locally verified | PCE-07, PCE-11, PCE-16, PCE-34, PCE-36, PCE-37, PCE-40 all matched |
-| REQ-011 | In Execute | Locally verified | PCE-08, PCE-32, PCE-33, PCE-49, PCE-50 matched against independent oracles |
-| REQ-028 | In Execute | Locally verified | PCE-13, PCE-28 to PCE-31, PCE-35 all matched |
-| REQ-029 | In Execute | Locally verified | PCE-12, PCE-17 to PCE-27, PCE-41, PCE-42 all matched |
-| REQ-031 | In Execute | Locally verified | PCE-26, PCE-37 to PCE-43 all matched |
-| REQ-003 | In Execute | **Blocked** | PCE-45 matched; PCE-44's declared baseline now pinned and discriminated, target interpreter still unverified (Finding 3) |
-| REQ-027 | In Execute | **Blocked** | PCE-46 matched locally; PCE-47 has no evidence and is externally blocked |
+| Formatting | `python -m ruff format --check src/task-analyzer-server tests/server` | 0 | 40 files already formatted |
+| Lint | `python -m ruff check src/task-analyzer-server tests/server` | 0 | All checks passed |
+| Types | `python -m mypy --strict src/task-analyzer-server/task_analyzer_server` | 0 | 11 source files, no issues |
+| Regression suite | `python -m pytest tests/server` | 0 | **588 passed**, 0 failed, 0 skipped, 59.64 s |
+| Dependency consistency | `python -m pip check` | 0 | No broken requirements found |
+| Full build | `python -m build --no-isolation` in an isolated copy of actual package sources | 0 | sdist and wheel built using the locked backend |
+| Installed distribution | Suite `test_installed_distribution.py`; additionally install/import the full-build wheel in a fresh runtime environment | 0 | Packaged schema, disposable initialization, factory startup, absent-database refusal, and process restart; no editable import |
+| Spec structure | `python .ai/skills/tlc-spec-driven/scripts/validate_spec.py persistent-task-creation-editing` | 0 | 0 errors, 0 warnings |
+| Task structure | `python .ai/skills/tlc-spec-driven/scripts/validate_tasks.py persistent-task-creation-editing` | 0 | 0 errors, 5 reviewed warnings |
+| Feature completion | `python .ai/skills/tlc-spec-driven/scripts/validate_state.py persistent-task-creation-editing` | 1 | Expected: this evidence-backed report is FAIL; the feature is not complete |
 
----
+The task warnings concern Tests:none on T1/T2/T30/T31 (the approved matrix permits it) and T22's two-file HTTP composition task (explicitly justified by Design/Tasks). The two test warnings are existing Starlette/HTTPX and AnyIO deprecations; they were not suppressed and do not authorize adding a library. Build byte-compilation warnings result from audit isolation using `PYTHONDONTWRITEBYTECODE=1`.
 
-## Summary
+Runtime data recorded by the hash lock: FastAPI 0.141.1, Starlette 1.6.0, Pydantic 2.13.5, Uvicorn 0.52.4, regex 2026.9.10, tzdata 2026.4, pytest 9.1.1. This Windows run establishes no Ubuntu compatibility claim.
 
-**Overall: Not ready — every local check passes, feature completion is blocked externally.**
+**Test integrity:** baseline `127d777` has no server tests; current suite has 588. The implementation added tests (+588); no existing protected scenario was modified in this audit. The scratch's independent full baseline also passed all 588 tests (57.58 s). No test was skipped or weakened to obtain a passing gate. A process restart/crash test is not evidence of physical power-loss durability.
 
-- **Spec-anchored check:** 51/52 criteria fully satisfied within the locally verifiable scope; 0 spec-precision gaps; PCE-44 local half covered, target half pending; PCE-47 unmet.
-- **Sensor:** 12 distinct mutations across two passes, **12 killed, 0 survived**.
-- **Gate:** 5/5 green — format, lint, mypy strict, 588 tests, pip check, all exit 0.
+## Spec-anchored acceptance evidence
 
-**What works.** The behavioral core is implemented accurately and the tests genuinely discriminate it. Grapheme-cluster counting, accent-preserving comparison keys, both exceptional-midnight rules with independently sourced IANA oracles, the inclusive `0001-01-01`..`9999-12-30` range, the two distinct uniqueness populations, single-transaction mutation-plus-outcome commit, replay without reapplication, and unknown-versus-rejection separation each survived targeted fault injection. The approved protected values — 200/201, 5,000/5,001, `Read notes` / ` READ  NOTES `, `Review résumé` / `Review resume`, September 14/15, the `Pacific/Apia` `2011-12-30T10:00:00.000000Z` oracle — are all present and unaltered.
+The following map was checked against the approved outcomes, the actual test bodies, and the executed suite. Each reference cites an assertion line. **Covered** means that the named regression scenario asserts the required value/state; it does not claim exhaustive proof of the criterion or override F1-F5. Fifty criteria have local scenario coverage, PCE-44 has local evidence plus an external gap, and PCE-47 has no actual access evidence. No new behavioral default or spec-precision change is proposed.
 
-The declared runtime baseline is now pinned too: lowering it one minor version is enough to fail the suite.
+| Criterion | Required outcome | Actual assertion evidence | Local scenario result |
+| --- | --- | --- | --- |
+| PCE-01 | Title-only creation is pending with absent optional fields | `tests/server/integration/test_services_create.py:187` — `result.outcome == 'succeeded'`; `tests/server/integration/test_services_create.py:191` — `result.task.observations is None`; `tests/server/integration/test_services_create.py:192` — `result.task.deadline is None`; `tests/server/integration/test_services_create.py:193` — `result.task.status == 'pending'` | Covered |
+| PCE-02 | Empty and whitespace-only title rejected | `tests/server/unit/test_domain_validation.py:84` — `issues_for(title='') == (REQUIRED_TITLE,)` | Covered |
+| PCE-03 | Exactly 200 characters after edge trimming accepted | `tests/server/unit/test_domain_validation.py:155` — `issues_for(title=f"   {'a' * 200}   ") == ()` | Covered |
+| PCE-04 | 201 title characters rejected | `tests/server/unit/test_domain_validation.py:124` — `issues_for(title='a' * 201) == (TOO_LONG_TITLE,)` | Covered |
+| PCE-05 | 5,000 observation characters accepted | `tests/server/unit/test_domain_validation.py:178` — `issues_for(observations='a' * 5000) == ()` | Covered |
+| PCE-06 | 5,001 observation characters rejected | `tests/server/unit/test_domain_validation.py:183` — `issues_for(observations='a' * 5001) == (TOO_LONG_OBSERVATIONS,)` | Covered |
+| PCE-07 | Observation line breaks persist unchanged | `tests/server/integration/test_services_create.py:217` — `stored_tasks(settings)[0].observations == observations` | Covered |
+| PCE-08 | The supplied calendar date persists | `tests/server/integration/test_services_create.py:206` — `stored[0].deadline == date(2026, 9, 14)` | Covered |
+| PCE-09 | A valid past deadline is accepted and stored | `tests/server/integration/test_services_create.py:226` — `result.outcome == 'succeeded'`; `tests/server/integration/test_services_create.py:227` — `stored_tasks(settings)[0].deadline == date(2020, 1, 31)` | Covered |
+| PCE-10 | Non-calendar dates rejected | `tests/server/unit/test_domain_validation.py:283` — `issues_for(deadline=deadline) == (INVALID_DEADLINE,)` | Covered |
+| PCE-11 | All editable fields persist together | `tests/server/integration/test_services_edit.py:310` — `result.outcome == 'succeeded'`; `tests/server/integration/test_services_edit.py:314` — `stored.title == NEW_TITLE`; `tests/server/integration/test_services_edit.py:315` — `stored.observations == 'Replaced'`; `tests/server/integration/test_services_edit.py:316` — `stored.deadline == date(2026, 9, 20)` | Covered |
+| PCE-12 | Editing retains task identity | `tests/server/integration/test_services_edit.py:374` — `result.task.task_id == task_id` | Covered |
+| PCE-13 | Editing retains original creation time | `tests/server/integration/test_services_edit.py:390` — `stored.created_at == SERVER_NOW` | Covered |
+| PCE-14 | Editing retains pending status and no completion time | `tests/server/integration/test_services_edit.py:376` — `result.task.status == 'pending'`; `tests/server/integration/test_services_edit.py:377` — `result.task.completed_at is None` | Covered |
+| PCE-15 | Invalid edit rejects and preserves all stored columns | `tests/server/integration/test_services_edit.py:494` — `result.outcome == 'rejected'`; `tests/server/integration/test_services_edit.py:495` — `result.original_http_status == 422`; `tests/server/integration/test_services_edit.py:497` — `result.error.fields == (REQUIRED_TITLE,)`; `tests/server/integration/test_services_edit.py:498` — `stored_columns(settings, task_id) == before` | Covered |
+| PCE-16 | Removing optional fields persists absence | `tests/server/integration/test_services_edit.py:329` — `stored.observations is None`; `tests/server/integration/test_services_edit.py:330` — `stored.deadline is None` | Covered |
+| PCE-17 | Protected case/space title examples compare equal | `tests/server/unit/test_domain_title_key.py:26` — `title_key('Read notes') == title_key(' READ  NOTES ')` | Covered |
+| PCE-18 | Protected accented and unaccented title examples differ | `tests/server/unit/test_domain_title_key.py:31` — `title_key(ACCENTED_TITLE) != title_key(PLAIN_TITLE)` | Covered |
+| PCE-19 | Dated uniqueness includes completed tasks | `tests/server/integration/test_services_uniqueness.py:412` — `result.outcome == 'rejected'`; `tests/server/integration/test_services_uniqueness.py:414` — `result.error.conflicting_task_id == completed` | Covered |
+| PCE-20 | Undated pending equivalent title conflicts | `tests/server/integration/test_services_uniqueness.py:473` — `result.outcome == 'rejected'`; `tests/server/integration/test_services_uniqueness.py:475` — `result.error.code == ErrorCode.TASK_UNIQUENESS_CONFLICT`; `tests/server/integration/test_services_uniqueness.py:476` — `result.error.conflicting_task_id == existing` | Covered |
+| PCE-21 | Equivalent titles on different dates coexist | `tests/server/integration/test_services_uniqueness.py:425` — `result.outcome == 'succeeded'`; `tests/server/integration/test_services_uniqueness.py:426` — `len(stored_tasks(settings)) == 2` | Covered |
+| PCE-22 | Dated and undated equivalent titles coexist | `tests/server/integration/test_services_uniqueness.py:437` — `result.outcome == 'succeeded'`; `tests/server/integration/test_services_uniqueness.py:438` — `len(stored_tasks(settings)) == 2` | Covered |
+| PCE-23 | Editing excludes the target itself | `tests/server/integration/test_services_uniqueness.py:599` — `result.outcome == 'succeeded'`; `tests/server/integration/test_services_uniqueness.py:601` — `result.task.title == EQUIVALENT_TITLE` | Covered |
+| PCE-24 | Deleted tasks do not block equivalent creation | `tests/server/integration/test_services_uniqueness.py:500` — `result.outcome == 'succeeded'` | Covered |
+| PCE-25 | Completed undated tasks do not block pending creation | `tests/server/integration/test_services_uniqueness.py:489` — `result.outcome == 'succeeded'` | Covered |
+| PCE-26 | Uniqueness rejection names the conflicting task | `tests/server/integration/test_services_uniqueness.py:376` — `result.error.conflicting_task_id == existing` | Covered |
+| PCE-27 | Rejected conflicting edit preserves both tasks entirely | `tests/server/integration/test_services_uniqueness.py:574` — `stored_columns(settings, existing) == existing_before`; `tests/server/integration/test_services_uniqueness.py:575` — `stored_columns(settings, edited) == edited_before` | Covered |
+| PCE-28 | Creation instant comes from server clock when applied | `tests/server/integration/test_services_create.py:448` — `result.task.created_at == SERVER_NOW`; `tests/server/integration/test_services_create.py:449` — `stored_tasks(settings)[0].created_at == SERVER_NOW` | Covered |
+| PCE-29 | Initial product zone is retained | `tests/server/integration/test_services_configuration.py:140` — `view.configured is True`; `tests/server/integration/test_services_configuration.py:141` — `view.product_time_zone == PRODUCT_ZONE`; `tests/server/integration/test_services_configuration.py:142` — `retained_zone(settings) == PRODUCT_ZONE` | Covered |
+| PCE-30 | Product date uses server time and configured zone | `tests/server/integration/test_services_configuration.py:151` — `view.server_now == SERVER_NOW`; `tests/server/integration/test_services_configuration.py:152` — `view.product_date == PRODUCT_DATE_IN_SAO_PAULO` | Covered |
+| PCE-31 | A changed desktop zone cannot replace the product zone | `tests/server/integration/test_services_configuration.py:253` — `retained_zone(settings) == PRODUCT_ZONE` | Covered |
+| PCE-32 | September 14 cutoff is September 15 local midnight | `tests/server/unit/test_clock_cutoff.py:71` — `cutoff == SEPTEMBER_15_MIDNIGHT`; `tests/server/unit/test_clock_cutoff.py:72` — `cutoff.astimezone(SAO_PAULO) == datetime(2026, 9, 15, 0, 0, tzinfo=SAO_PAULO)` | Covered |
+| PCE-33 | At cutoff, the pending deadline is overdue without grace | `tests/server/unit/test_clock_cutoff.py:89` — `midnight == cutoff`; `tests/server/unit/test_clock_cutoff.py:90` — `midnight >= cutoff` | Covered |
+| PCE-34 | Accepted edited state survives a new server process | `tests/server/integration/test_durability.py:388` — `edited.status_code == 200`; `tests/server/integration/test_durability.py:389` — `survivor == edited.json()['task']` | Covered |
+| PCE-35 | Configured zone survives process restart | `tests/server/integration/test_durability.py:417` — `configuration['configured'] is True`; `tests/server/integration/test_durability.py:418` — `configuration['product_time_zone'] == PRODUCT_ZONE` | Covered |
+| PCE-36 | A fresh client reads persisted task identity and zone | `tests/server/integration/test_durability.py:465` — `'set-cookie' not in reading.headers`; `tests/server/integration/test_durability.py:466` — `reading.json()['product_time_zone'] == PRODUCT_ZONE`; `tests/server/integration/test_durability.py:467` — `[item['task_id'] for item in reading.json()['items']] == [created.json()['task']['task_id']]` | Covered |
+| PCE-37 | A failed commit is not reported as persisted | `tests/server/integration/test_services_runner.py:503` — `services.lookup_operation(settings, operation_id) is None`; `tests/server/integration/test_services_runner.py:504` — `read_tasks(settings) == ()` | Covered |
+| PCE-38 | Consultation returns the retained original result | `tests/server/integration/test_services_runner.py:517` — `services.lookup_operation(settings, operation_id) == original` | Covered |
+| PCE-39 | Repetition returns original result and creates only once | `tests/server/integration/test_services_runner.py:356` — `repeated == original`; `tests/server/integration/test_services_runner.py:357` — `command.runs == 1`; `tests/server/integration/test_services_runner.py:358` — `[task.task_id for task in read_tasks(settings)] == [task_id]` | Covered |
+| PCE-40 | Original operation is consultable after response/session loss and restart | `tests/server/integration/test_durability.py:484` — `consulted.status_code == 200`; `tests/server/integration/test_durability.py:485` — `consulted.json() == original.json()` | Covered |
+| PCE-41 | Original uniqueness rejection remains consultable | `tests/server/integration/test_services_uniqueness.py:523` — `services.lookup_operation(settings, request.operation_id) == result`; `tests/server/integration/test_services_uniqueness.py:526` — `result.outcome == 'rejected'` | Covered |
+| PCE-42 | Different conflicting action rejects under its own identity | `tests/server/integration/test_services_uniqueness.py:540` — `refused.outcome == 'rejected'`; `tests/server/integration/test_services_uniqueness.py:541` — `refused.operation_id == second.operation_id`; `tests/server/integration/test_services_uniqueness.py:543` — `refused.error.code == ErrorCode.TASK_UNIQUENESS_CONFLICT`; `tests/server/integration/test_services_uniqueness.py:544` — `len(stored_tasks(settings)) == 1` | Covered |
+| PCE-43 | Unknown is distinct from a terminal rejection | `tests/server/integration/test_api_operations.py:280` — `response.status_code == 404`; `tests/server/integration/test_api_operations.py:281` — `response.json()['error']['code'] == ErrorCode.OPERATION_RESULT_UNKNOWN.value` | Covered |
+| PCE-44 | Declared minimum is Python 3.13; actual target still pending | `tests/server/unit/test_packaging_metadata.py:46` — `declared_floor() == APPROVED_FLOOR` | Partial: local only |
+| PCE-45 | Dedicated self-hosting from an installed distribution | `tests/server/integration/test_installed_distribution.py:465` and `tests/server/integration/test_installed_distribution.py:503`: installed initializer and restart assertions; actual full-build wheel import and isolated initializer also passed in this audit | Covered locally |
+| PCE-46 | No product credential is required; forwarded identity is not an account | `tests/server/integration/test_api_app.py:395` — `forwarded.status_code == anonymous.status_code`; `tests/server/integration/test_api_app.py:396` — `forwarded.json() == anonymous.json()` | Covered |
+| PCE-47 | Private access through Tailscale | No authorized host/access evidence; deployment assets alone do not prove it | EXTERNAL GAP |
+| PCE-48 | Combining sequences and joined emoji count as one visual character | `tests/server/unit/test_domain_validation.py:131` — `len(title) == 400`; `tests/server/unit/test_domain_validation.py:132` — `issues_for(title=title) == ()` | Covered |
+| PCE-49 | Repeated midnight uses its first occurrence | `tests/server/unit/test_clock_cutoff.py:118` — `cutoff == datetime(2026, 11, 1, 4, 0, tzinfo=UTC)`; `tests/server/unit/test_clock_cutoff.py:119` — `cutoff < datetime(2026, 11, 1, 5, 0, tzinfo=UTC)` | Covered |
+| PCE-50 | Skipped Apia date uses the first instant after the skip | `tests/server/unit/test_clock_cutoff.py:154` — `cutoff == datetime(2011, 12, 30, 10, 0, tzinfo=UTC)`; `tests/server/unit/test_clock_cutoff.py:155` — `cutoff.astimezone(APIA) == datetime(2011, 12, 31, 0, 0, tzinfo=APIA)` | Covered |
+| PCE-51 | Both supported date endpoints accepted as edits | `tests/server/integration/test_services_edit.py:629` — `first is not None`; `tests/server/integration/test_services_edit.py:630` — `second is not None`; `tests/server/integration/test_services_edit.py:631` — `first.deadline == date(1, 1, 1)`; `tests/server/integration/test_services_edit.py:632` — `second.deadline == date(9999, 12, 30)` | Covered |
+| PCE-52 | Out-of-range edit is rejected without state change | `tests/server/integration/test_services_edit.py:644` — `result.outcome == 'rejected'`; `tests/server/integration/test_services_edit.py:645` — `result.error is not None`; `tests/server/integration/test_services_edit.py:646` — `result.error.fields == (INVALID_DEADLINE,)`; `tests/server/integration/test_services_edit.py:647` — `stored_columns(settings, task_id) == before` | Covered |
 
-**Issues found.** Finding 2 (test-coverage gap) is **resolved** by `5fe1955` and independently re-verified. What remains is entirely external: Finding 1 (PCE-47 private access) and Finding 3 (PCE-44 target interpreter). Neither is a code defect and neither can be closed locally.
+PCE-02 also has the whitespace, tabs, newline, NBSP and EM SPACE parameterized cases in `test_domain_validation.py:110`. PCE-48 also covers 201 combining/emoji titles and 5,000/5,001 observation clusters; no code-point or byte counting is substituted. PCE-19/24/25 have matching edit and pending/completed/deleted population cases in `test_services_uniqueness.py`. PCE-43 also compares a consulted rejection's HTTP 200 with its retained rejected outcome in `test_api_operations.py:221`.
 
-**Next steps.**
+**Time oracle check:** cutoff expectations are literal, spec-aligned UTC instants, not values generated by the cutoff helper. The protected Apia oracle is `2011-12-30T10:00:00Z`; repeated Havana midnight expects the earlier occurrence. The 13 parameterized fixtures cover ordinary and 23/25-hour days, missing/repeated midnight, a whole skipped date, and both supported date endpoints in UTC and positive/negative fixed offsets. This audit verified fixture/code consistency; it did not freshly download IANA sources or assert power-loss guarantees.
 
-1. No further local work is required for delivery 1A. There is no open fix task.
-2. Leave PCE-47 and PCE-44's target-interpreter half open until an explicitly authorized deployment session on the user's Ubuntu server produces the evidence. Local task completion cannot substitute for it.
-3. Do not mark delivery 1A complete, and do not record `Verified` traceability, until both are closed. `validate_state.py` will correctly keep exiting 1 while the verdict stands at FAIL — that exit is the intended signal here, not an obstacle to work around.
+## Discrimination sensor
 
----
+**Depth:** nine targeted behavior mutations for this data-integrity feature. This is an expanded manual sensor, not exhaustive mutation coverage of every branch.
+
+A fresh temporary directory contained copies of all tracked and nonignored untracked working-tree files, including the initial cache files. The sensor changed only copied production files. PYTHONPATH was pinned to the scratch package root; a subprocess asserted that the imported `task_analyzer_server.__file__` resolved under that copy. A full unmutated scratch suite passed 588/588 before any mutations. Each mutation ran in a fresh Python process, then its source file was restored byte-for-byte inside the scratch. Existing tests were unchanged.
+
+| Mutation | Production location | Injected behavior | Suite | Result |
+| --- | --- | --- | --- | --- |
+| M01 | `src\task-analyzer-server\task_analyzer_server\domain.py:39` | `TITLE_MAX_CLUSTERS = 200` → `TITLE_MAX_CLUSTERS = 199` | `tests/server/unit/test_domain_validation.py` | KILLED, exit 1; 4 failed, 48 passed |
+| M02 | `src\task-analyzer-server\task_analyzer_server\domain.py:201` | `_GRAPHEME_CLUSTER.finditer(text)` → `text` | `tests/server/unit/test_domain_validation.py` | KILLED, exit 1; 4 failed, 48 passed |
+| M03 | `src\task-analyzer-server\task_analyzer_server\domain.py:43` | `MAXIMUM_DEADLINE = date(9999, 12, 30)` → `MAXIMUM_DEADLINE = date(9999, 12, 31)` | `tests/server/unit/test_domain_validation.py` | KILLED, exit 1; 1 failed, 51 passed |
+| M04 | `src\task-analyzer-server\task_analyzer_server\domain.py:92` | `return collapsed.casefold()` → `return collapsed.lower()` | `tests/server/unit/test_domain_title_key.py` | KILLED, exit 1; 1 failed, 16 passed |
+| M05 | `src\task-analyzer-server\task_analyzer_server\clock.py:148` | `min(exact)` → `max(exact)` | `tests/server/unit/test_clock_cutoff.py` | KILLED, exit 1; 4 failed, 35 passed |
+| M06 | `src\task-analyzer-server\task_analyzer_server\storage.py:247` | `connection.execute(COMMIT)` → `connection.execute("ROLLBACK")` | `tests/server/integration/test_services_runner.py` | KILLED, exit 1; 11 failed, 10 passed |
+| M07 | `src\task-analyzer-server\task_analyzer_server\services.py:759` | `return retained.result` → `return command(connection, request)` | `tests/server/integration/test_services_runner.py` | KILLED, exit 1; 2 failed, 19 passed |
+| M08 | `src\task-analyzer-server\task_analyzer_server\storage.py:295` | `return ConfiguredZone(ZoneOutcome.CONFLICTING, retained)` → `return ConfiguredZone(ZoneOutcome.ALREADY_SET, retained)` | `tests/server/integration/test_services_configuration.py` | KILLED, exit 1; 4 failed, 11 passed |
+| M09 | `pyproject.toml:9` | `requires-python = ">=3.13"` → `requires-python = ">=3.12"` | `tests/server/unit/test_packaging_metadata.py` | KILLED, exit 1; 3 failed, 2 passed |
+
+Each command used `python -m pytest <listed suite> -q`, the declared pytest gate restricted to tests of the mutated behavior. Failures were behavioral assertions or required boundary checks, not import/collection failures. **Result: 9 injected, 9 killed, 0 survived.** This does not negate the concrete coverage gaps exposed by the separate F1-F5 reproductions.
+
+**Isolation:** immediately before and after the sensor, real `git status --porcelain` contained exactly:
+
+```text
+?? src/task-analyzer-server/task_analyzer_server/__pycache__/
+?? tests/server/integration/__pycache__/
+?? tests/server/unit/__pycache__/
+```
+
+The comparison was equal. The scratch was then deleted only after checking its resolved parent/name against the allocated temporary audit root. No git stash was used. Report, lesson and root Handoff edits occurred after this isolation check. The source/test tree stayed unchanged.
+
+Raw build, baseline, provenance, and mutation logs for this run were retained under `C:/Users/Becker/AppData/Local/Temp/task-analyzer-audit-42a4a6f99c2240ecb42ce99a705caea0/`; these are temporary supporting artifacts. Reproduction scheduling, inputs, outputs and requirement evidence are recorded above so the findings do not depend on those temporary paths remaining available.
+
+## Code quality and scope
+
+- The approved source/module layout, Python types, and configured formatter/linter/type gates are followed. Validation, title comparison, storage transactions, services, and HTTP mapping remain separate; no extra lifecycle commands, metrics, client, accounts, or backlog capabilities were added.
+- Existing tests preserve the protected input pairs and exercise stored outcomes, whole-state rejection preservation, immutable replay, restart, and uniqueness populations. Their nominal assertions are useful and the sensor confirms discrimination for its nine targets.
+- Per-layer completeness is **not** established: initializer ownership races, async routing under real database contention, parser/canonicalization numeric boundaries, coherent read snapshots, and actual runtime logger configuration are missing scenarios (F1-F5).
+- Existing module-level REQ/PCE annotations provide traceability; not every test has a standalone criterion annotation. No criteria or approved test meaning was changed by this audit.
+- Backend-only automated checks apply here; Windows UI layout/UAT and future 1B transitions remain outside this delivery.
+- README, AGENTS, and some historical spec prose still describe pre-implementation state. The reconciled Handoff and Git history establish current task completion; those historical phrases must not be treated as proof that the implementation is absent or that approval was never granted. This audit did not rewrite product inputs.
+
+## Historical verification and lesson provenance
+
+The preceding report at `9541255`/`aa59004` covered `127d777..5fe1955`. Its 588-test result and earlier sensor outcomes are historical evidence, not this audit's measurements. This report supersedes its statement that only external work remains.
+
+**Historical Finding 2 / mutant M11 (resolved):** the earlier sensor lowered `pyproject.toml` from Python `>=3.13` to `>=3.9`; the original 583 tests did not detect it. Fix `5fe1955` added five packaging-metadata tests. The earlier re-verification killed both `>=3.9` and `>=3.12` variants. That is the original grounding for candidate lesson **L-001**, whose source string refers to "validation.md Finding 2 (mutant M11)". It is distinct from new finding F2 in this report. This audit's M09 independently killed `>=3.12` again.
+
+**Historical sensor pass 1 / L-002:** the preceding report discarded an initial ten-mutation run because an editable install imported the real checkout rather than the scratch. Its rerun pinned PYTHONPATH and checked provenance. The existing candidate lesson **L-002** refers to that historical event; it is not a claim that any mutation survived in this audit. The original L-001/L-002 entries were preserved.
+
+New grounded F1-F5 gaps are recorded only through the installed `scripts/lessons.py`, as project-local candidate lessons. No recurrence promotion or manual bookkeeping is applied. External host authorization gaps are reported as completion constraints; they do not supply a new code implementation lesson.
+
+## Requirement disposition
+
+No requirement is marked Verified. Existing local evidence remains useful for REQ-007/008/010/011/028/029/031, but the newly found local defects require correction and independent re-verification. REQ-003 and REQ-027 also retain their mandatory external checkpoints. `validate_state.py` must continue to fail while this report's verdict is FAIL.
+
+The authorized audit is complete; the implementation is not ready for overall PASS. Review the five bounded fix proposals, preserve their regression expectations, and approve the applicable fix plan before changing application code.
 
 ## Open questions
 
-- When will an authorized deployment session on the user's own Ubuntu server take place, so PCE-47's private-access evidence and PCE-44's target-interpreter evidence can be recorded? Until then delivery 1A stays incomplete regardless of local results.
-- Which tailnet hostname, authorized device identifiers, installation paths and installed interpreter version set will that session use? These values are still owed by the user and are not decided by this report.
-- **Resolved 2026-09-14:** the PCE-44 baseline regression assertion landed as a standalone `tests/server/unit/test_packaging_metadata.py` reading the checkout's `pyproject.toml`. Should it additionally assert the built wheel's `Requires-Python` metadata inside `test_installed_distribution.py`? Not required to close Finding 2, and only worth doing if the wheel could ever be built from metadata other than that file.
-- Should per-test PCE annotations supplement the current per-module headers, to make future criterion-level re-verification cheaper? This is a documentation preference, not a defect, and needs no behavioral approval.
+- When will F1-F5's correction scope be approved for implementation and independent re-verification?
+- Which installed interpreter, target-specific lock, paths, tailnet hostname and authorized device identifiers will the separately authorized Ubuntu/private-access verification use?

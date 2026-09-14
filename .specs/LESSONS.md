@@ -26,6 +26,36 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: validation.md sensor pass 1 (all 10 mutants falsely survived) (verification)
 - last seen: 2026-09-14T10:25:40Z
 
+### L-003 - Acquire exclusive ownership before initializing a database and clean up only files owned by that attempt.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `storage` · harmful: 0
+- features: persistent-task-creation-editing
+- evidence: validation.md F1 (storage)
+- last seen: 2026-09-14T17:13:00Z
+
+### L-004 - Test concurrent HTTP progress under real SQLite contention to detect blocking work on the event loop.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `api` · harmful: 0
+- features: persistent-task-creation-editing
+- evidence: validation.md F2 (api)
+- last seen: 2026-09-14T17:13:00Z
+
+### L-005 - Exercise JSON parser and canonicalization boundaries through HTTP and assert the exact rejection and retained outcome.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `api` · harmful: 0
+- features: persistent-task-creation-editing
+- evidence: validation.md F3 (api)
+- last seen: 2026-09-14T17:13:00Z
+
+### L-006 - Read related response metadata and rows within one database snapshot and test concurrent setup.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `storage` · harmful: 0
+- features: persistent-task-creation-editing
+- evidence: validation.md F4 (storage)
+- last seen: 2026-09-14T17:13:00Z
+
+### L-007 - Verify structured logging through the actual runtime logger configuration, including server and access handlers.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `logging` · harmful: 0
+- features: persistent-task-creation-editing
+- evidence: validation.md F5 (logging)
+- last seen: 2026-09-14T17:13:00Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

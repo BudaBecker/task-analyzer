@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 3,
+  "next_id": 8,
   "lessons": [
     {
       "id": "L-001",
@@ -40,6 +40,96 @@
       ],
       "created": "2026-09-14T10:25:40Z",
       "last_seen": "2026-09-14T10:25:40Z"
+    },
+    {
+      "id": "L-003",
+      "key": "ac_gap::acquire exclusive ownership before initializing a database and clean up only files owned by that attempt",
+      "text": "Acquire exclusive ownership before initializing a database and clean up only files owned by that attempt.",
+      "signal": "ac_gap",
+      "scope": "storage",
+      "status": "candidate",
+      "features": [
+        "persistent-task-creation-editing"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "validation.md F1 (storage)"
+      ],
+      "created": "2026-09-14T17:13:00Z",
+      "last_seen": "2026-09-14T17:13:00Z"
+    },
+    {
+      "id": "L-004",
+      "key": "ac_gap::test concurrent http progress under real sqlite contention to detect blocking work on the event loop",
+      "text": "Test concurrent HTTP progress under real SQLite contention to detect blocking work on the event loop.",
+      "signal": "ac_gap",
+      "scope": "api",
+      "status": "candidate",
+      "features": [
+        "persistent-task-creation-editing"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "validation.md F2 (api)"
+      ],
+      "created": "2026-09-14T17:13:00Z",
+      "last_seen": "2026-09-14T17:13:00Z"
+    },
+    {
+      "id": "L-005",
+      "key": "ac_gap::exercise json parser and canonicalization boundaries through http and assert the exact rejection and retained outcome",
+      "text": "Exercise JSON parser and canonicalization boundaries through HTTP and assert the exact rejection and retained outcome.",
+      "signal": "ac_gap",
+      "scope": "api",
+      "status": "candidate",
+      "features": [
+        "persistent-task-creation-editing"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "validation.md F3 (api)"
+      ],
+      "created": "2026-09-14T17:13:00Z",
+      "last_seen": "2026-09-14T17:13:00Z"
+    },
+    {
+      "id": "L-006",
+      "key": "ac_gap::read related response metadata and rows within one database snapshot and test concurrent setup",
+      "text": "Read related response metadata and rows within one database snapshot and test concurrent setup.",
+      "signal": "ac_gap",
+      "scope": "storage",
+      "status": "candidate",
+      "features": [
+        "persistent-task-creation-editing"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "validation.md F4 (storage)"
+      ],
+      "created": "2026-09-14T17:13:00Z",
+      "last_seen": "2026-09-14T17:13:00Z"
+    },
+    {
+      "id": "L-007",
+      "key": "ac_gap::verify structured logging through the actual runtime logger configuration including server and access handlers",
+      "text": "Verify structured logging through the actual runtime logger configuration, including server and access handlers.",
+      "signal": "ac_gap",
+      "scope": "logging",
+      "status": "candidate",
+      "features": [
+        "persistent-task-creation-editing"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "validation.md F5 (logging)"
+      ],
+      "created": "2026-09-14T17:13:00Z",
+      "last_seen": "2026-09-14T17:13:00Z"
     }
   ]
 }
