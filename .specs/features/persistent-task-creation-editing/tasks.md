@@ -225,7 +225,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T4: Implement JSON-line structured logging
+### T4: Implement JSON-line structured logging [Complete]
 
 **What**: Add `configure_logging(level)` producing the approved JSON-line records through the standard `logging` module.
 **Where**: `src/task-analyzer-server/task_analyzer_server/logging_config.py`
@@ -240,11 +240,11 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] Records serialize as one JSON object per line with `timestamp`, `level`, `event`, `request_id`, optional `operation_id` and `task_id`, `outcome`, `error_code`, and `duration_ms`.
-- [ ] Task titles, observations, request bodies, canonical requests, and secrets are never emitted, asserted by a test that supplies those values and checks their absence.
-- [ ] Durations come from a monotonic clock, and a formatting failure cannot raise into caller control flow.
-- [ ] Gate check passes: `python -m pytest tests/server/unit`.
-- [ ] Test count: at least 6 tests pass in `tests/server/unit/test_logging_config.py` (no silent deletions).
+- [x] Records serialize as one JSON object per line with `timestamp`, `level`, `event`, `request_id`, optional `operation_id` and `task_id`, `outcome`, `error_code`, and `duration_ms`.
+- [x] Task titles, observations, request bodies, canonical requests, and secrets are never emitted, asserted by a test that supplies those values and checks their absence.
+- [x] Durations come from a monotonic clock, and a formatting failure cannot raise into caller control flow.
+- [x] Gate check passes: `python -m pytest tests/server/unit`.
+- [x] Test count: at least 6 tests pass in `tests/server/unit/test_logging_config.py` (no silent deletions).
 
 **Tests**: unit
 **Gate**: quick
