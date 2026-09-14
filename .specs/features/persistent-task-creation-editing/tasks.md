@@ -167,7 +167,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T2: Lock server and development dependencies
+### T2: Lock server and development dependencies [Complete]
 
 **What**: Add `requirements/server.in` and `requirements/dev.in` with their hash-pinned generated lock files, and install the development environment.
 **Where**: `requirements/`
@@ -182,12 +182,12 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] `requirements/server.in` lists the runtime inputs and `requirements/dev.in` includes `-r server.in` and lists pytest, HTTPX, Ruff, mypy, setuptools, build, and pip-tools. Runtime inputs match the direct dependencies in pyproject.toml. The requirements README ends with Open questions and records any target environment still awaiting verification.
-- [ ] `requirements/server-py313.txt` and `requirements/dev-py313.txt` pin released versions with hashes for the local Python 3.13 environment. Record its OS, architecture and interpreter in `requirements/README.md`; these locks do not claim cross-platform validation.  FastAPI, Starlette, and Pydantic are resolved together and never upgraded independently.
-- [ ] A dependency incompatible with the Python 3.13 baseline is reported as a design-revision proposal instead of raising the minimum.
-- [ ] The design requires the lock to be compatible with the interpreter the Ubuntu target provides. That host is not accessible from this environment, so T2 locks against the declared 3.13 baseline and records the target-interpreter confirmation as an explicit pending item in the deployment guide (T31). It is never reported as performed.
-- [ ] `python -m pip check` reports no broken requirements in the locked environment.
-- [ ] Gate check passes: Bootstrap dependencies, including hash-verified installation and invocation of all approved tools. Full Build is required after T3/T4 at Phase 1 completion; no empty-test or missing-source failure is waived.
+- [x] `requirements/server.in` lists the runtime inputs and `requirements/dev.in` includes `-r server.in` and lists pytest, HTTPX, Ruff, mypy, setuptools, build, and pip-tools. Runtime inputs match the direct dependencies in pyproject.toml. The requirements README ends with Open questions and records any target environment still awaiting verification.
+- [x] `requirements/server-py313.txt` and `requirements/dev-py313.txt` pin released versions with hashes for the local Python 3.13 environment. Record its OS, architecture and interpreter in `requirements/README.md`; these locks do not claim cross-platform validation.  FastAPI, Starlette, and Pydantic are resolved together and never upgraded independently.
+- [x] A dependency incompatible with the Python 3.13 baseline is reported as a design-revision proposal instead of raising the minimum.
+- [x] The design requires the lock to be compatible with the interpreter the Ubuntu target provides. That host is not accessible from this environment, so T2 locks against the declared 3.13 baseline and records the target-interpreter confirmation as an explicit pending item in the deployment guide (T31). It is never reported as performed.
+- [x] `python -m pip check` reports no broken requirements in the locked environment.
+- [x] Gate check passes: Bootstrap dependencies, including hash-verified installation and invocation of all approved tools. Full Build is required after T3/T4 at Phase 1 completion; no empty-test or missing-source failure is waived.
 
 **Tests**: none
 **Gate**: bootstrap dependencies

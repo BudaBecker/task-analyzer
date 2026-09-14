@@ -1,0 +1,10 @@
+# Development toolchain for the Task Analyzer server.
+# Includes every runtime input so one environment serves tests and gates.
+-r server.in
+pytest
+httpx
+ruff
+mypy
+setuptools
+build
+pip-tools

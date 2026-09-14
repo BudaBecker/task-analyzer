@@ -1,0 +1,7 @@
+# Direct runtime dependencies of the Task Analyzer server.
+# Keep this list identical to [project].dependencies in pyproject.toml.
+fastapi
+uvicorn
+pydantic>=2
+regex
+tzdata
