@@ -704,7 +704,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T20: Implement the pending-task edit command
+### T20: Implement the pending-task edit command [Complete]
 
 **What**: Add the edit command replacing the editable state of a pending task while preserving identity, creation time, and status.
 **Where**: `src/task-analyzer-server/task_analyzer_server/services.py` (modify)
@@ -719,13 +719,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] A valid edit persists the requested title, observations, and deadline as one full replacement of the editable fields, and clearing an optional value persists its absence.
-- [ ] Task identity, original creation time, and pending status are preserved, including when the title changes.
-- [ ] An edit to an absent or excluded task is a stored rejection that never creates a task; a target outside the 1A pending-edit command is a stored state rejection with no state or time change.
-- [ ] A rejected edit leaves the entire persisted task unchanged, asserted by comparing the whole task before and after.
-- [ ] Integration tests repeat the applicable creation boundary fixtures as edits.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 20 tests pass in `tests/server/integration/test_services_edit.py` (no silent deletions).
+- [x] A valid edit persists the requested title, observations, and deadline as one full replacement of the editable fields, and clearing an optional value persists its absence.
+- [x] Task identity, original creation time, and pending status are preserved, including when the title changes.
+- [x] An edit to an absent or excluded task is a stored rejection that never creates a task; a target outside the 1A pending-edit command is a stored state rejection with no state or time change.
+- [x] A rejected edit leaves the entire persisted task unchanged, asserted by comparing the whole task before and after.
+- [x] Integration tests repeat the applicable creation boundary fixtures as edits.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 20 tests pass in `tests/server/integration/test_services_edit.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full

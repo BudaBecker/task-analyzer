@@ -1,8 +1,8 @@
 """Operation services for the Task Analyzer server.
 
-Covers PCE-01 through PCE-10, PCE-28 through PCE-31, PCE-35, PCE-37
+Covers PCE-01 through PCE-16, PCE-27 through PCE-31, PCE-35, PCE-37
 through PCE-43, PCE-48, PCE-51 and PCE-52 (REQ-007, REQ-008, REQ-010,
-REQ-028, REQ-031).
+REQ-028, REQ-029, REQ-031).
 
 One submitted attempt resolves once. The runner here turns a request
 plus a command into exactly one terminal result, and it does so in the
@@ -64,7 +64,12 @@ API_VERSION = "v1"
 CANONICAL_SEPARATOR = "|"
 
 CREATED_STATUS = 201
+EDITED_STATUS = 200
+NOT_FOUND_STATUS = 404
+STATE_INCOMPATIBLE_STATUS = 409
 VALIDATION_FAILED_STATUS = 422
+
+PENDING_STATUS = "pending"
 
 OperationCommand = Callable[
     [sqlite3.Connection, OperationRequest], OperationResult
@@ -228,6 +233,53 @@ def create_task(
     return apply_operation(settings, request, command)
 
 
+def edit_task(
+    settings: ServerSettings,
+    clock: Clock,
+    request: OperationRequest,
+    task_id: UUID,
+) -> OperationResult:
+    """Replace the editable state of one pending task.
+
+    A save carries the whole form, so the edit replaces every editable
+    field at once: an omitted or cleared optional value persists as
+    absent. Identity, original creation time and pending status belong
+    to the server and no edit moves them.
+
+    Args:
+        settings: Runtime configuration naming the database.
+        clock: The server's source of the current instant.
+        request: The submitted edit operation.
+        task_id: Identity of the task the request targets.
+
+    Returns:
+        The terminal result: the edited task, or the rejection that
+        left it exactly as it was.
+
+    Raises:
+        ProtocolRefusalError: If the attempt is refused before any
+            outcome exists.
+        sqlite3.Error: If the database cannot serve or commit the
+            attempt.
+    """
+
+    def command(
+        connection: sqlite3.Connection, submitted: OperationRequest
+    ) -> OperationResult:
+        """Apply the edit inside the open write transaction.
+
+        Args:
+            connection: Connection holding the write transaction.
+            submitted: The submitted edit operation.
+
+        Returns:
+            The terminal result of the attempt.
+        """
+        return _apply_edit(connection, submitted, clock, task_id)
+
+    return apply_operation(settings, request, command)
+
+
 def configure_zone(
     settings: ServerSettings, clock: Clock, zone_key: str
 ) -> ConfigurationView:
@@ -355,6 +407,62 @@ def _apply_creation(
         created_at=now,
     )
     return _success(request, now, CREATED_STATUS, stored)
+
+
+def _apply_edit(
+    connection: sqlite3.Connection,
+    request: OperationRequest,
+    clock: Clock,
+    task_id: UUID,
+) -> OperationResult:
+    """Settle one edit attempt inside the write transaction.
+
+    A target outside managed tasks reads as absent, so an edit can never
+    create a task. A managed target that is not pending is outside the
+    1A edit command: it is rejected with no change to its state or its
+    times, and delivery 1B adds the approved completed-task editing.
+
+    Args:
+        connection: Connection holding the write transaction.
+        request: The submitted edit operation.
+        clock: The server's source of the current instant.
+        task_id: Identity of the task the request targets.
+
+    Returns:
+        The edited task's success result, or a durable rejection that
+        leaves the task exactly as it was.
+
+    Raises:
+        ProtocolRefusalError: If no product time zone has been fixed.
+    """
+    require_product_time_zone(connection)
+    accepted = _accepted_input(request.payload)
+    if isinstance(accepted, tuple):
+        return _validation_rejection(request, clock, accepted)
+    target = storage.read_task(connection, task_id)
+    if target is None:
+        return _rejection(
+            request,
+            clock.now(),
+            NOT_FOUND_STATUS,
+            OperationError(code=ErrorCode.TASK_NOT_FOUND),
+        )
+    if target.status != PENDING_STATUS:
+        return _rejection(
+            request,
+            clock.now(),
+            STATE_INCOMPATIBLE_STATUS,
+            OperationError(code=ErrorCode.TASK_STATE_INCOMPATIBLE),
+        )
+    stored = storage.update_task(
+        connection,
+        task_id=task_id,
+        title=accepted.title,
+        title_key=title_key(accepted.title),
+        observations=accepted.observations,
+        deadline=_accepted_deadline(accepted.deadline),
+    )
+    return _success(request, clock.now(), EDITED_STATUS, stored)
 
 
 def _accepted_input(
