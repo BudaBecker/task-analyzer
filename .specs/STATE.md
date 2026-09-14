@@ -34,15 +34,15 @@ Approved product inputs remain in [Requirements](../docs/product/requirements.md
 ## Handoff
 
 - **Feature**: [Persistent task creation and editing](features/persistent-task-creation-editing/spec.md), delivery 1A.
-- **Phase / Task**: Documentation audit corrections complete. Behavioral clarifications are approved; the revised Design and formal Tasks await review/approval. No application task has started.
-- **Completed**: D1 (`bb0cd44`) records approved TIME-02/03, with 52 PCE criteria and all original scenario examples preserved. D2 (the commit carrying this snapshot) corrects bootstrap gates, one-way input/domain dependencies, independent initialization, the HTTP foundation, exact request correlation, installed-wheel verification and stale project status.
-- **Plan**: 31 unchecked implementation tasks in 9 phases; T11 precedes T7. T22 delivers the tested HTTP boundary across app.py/api.py; T27 verifies the installed distribution. Four proposed whole-phase batches are documented; worker delegation still requires the Execute-time offer and user choice.
-- **Checks**: validate_spec: 0 errors/0 warnings. validate_tasks: 0 errors/5 reviewed warnings (four none-test packaging/assets and T22's intentional two-file boundary). Semantic checks preserved every original product acceptance scenario, found exactly the approved PCE-08/09/50 wording changes plus PCE-51/52, verified 31 ordered task IDs, 176 local links/anchors and final Open questions headings. git diff --check passed. Application tests have not run.
-- **Next step**: Review the corrected Design and approve the task plan before any application implementation. Earlier AD-003 wording about task-plan approval records the runtime decision; it does not approve the current revised tasks.
+- **Phase / Task**: Execute. The user approved the feature artifacts on 2026-09-13, so Design and Tasks are closed and implementation is authorized. No implementation task is complete yet.
+- **Completed**: D1 (`bb0cd44`) records approved TIME-02/03, with 52 PCE criteria and all original scenario examples preserved. D2 (`127d777`) corrects bootstrap gates, one-way input/domain dependencies, independent initialization, the HTTP foundation, exact request correlation, installed-wheel verification and stale project status. The commit carrying this snapshot records the approval in spec, design and tasks.
+- **Plan**: 31 unchecked implementation tasks in 9 phases; T11 precedes T7. T22 delivers the tested HTTP boundary across app.py/api.py; T27 verifies the installed distribution. The user chose delegated execution on 2026-09-13: four sequential whole-phase batches (T1-T6, T11/T7-T10/T12, T13-T21, T22-T31), each worker committing one atomic commit per task. The independent Verifier runs after T31.
+- **Checks**: validate_spec: 0 errors/0 warnings. validate_tasks: 0 errors/5 reviewed warnings (four none-test packaging/assets and T22's intentional two-file boundary). Semantic checks preserved every original product acceptance scenario, found exactly the approved PCE-08/09/50 wording changes plus PCE-51/52, verified 31 ordered task IDs, 176 local links/anchors and final Open questions headings. Local environment confirmed for T1/T2: Python 3.13.2, pip 26.1.2, SQLite 3.45.3. Application tests have not run.
+- **Next step**: Execute batch 1 (Phases 1-2, T1-T6), then the remaining batches in order.
 - **Deployment checkpoint**: The user's own Ubuntu server still requires supplied host values and explicit deployment/database authorization. Confirm its interpreter before creating/validating its target-specific lock; local Python 3.13 locks are not target evidence. Overall feature PASS/Verified remains blocked until the required runtime and private-access checks pass.
-- **Authorization**: Documentation and local commits only for this round. No push, merge, application implementation, deployment or real database changes.
-- **Uncommitted files**: The D2 documentation changes are included in the commit carrying this snapshot; reconcile Git on resume.
-- **Branch**: `docs/1a-audit-corrections`, based on merged `main` at `c052f35`.
+- **Authorization**: Local implementation and per-task local commits under the approved plan. No push, merge, deployment, real-host configuration or real database changes.
+- **Uncommitted files**: The approval record is included in the commit carrying this snapshot; reconcile Git on resume.
+- **Branch**: `feat/persistent-task-creation-editing`, based on `docs/1a-audit-corrections` at `127d777`.
 
 ## Open questions
 

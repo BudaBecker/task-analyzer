@@ -2,7 +2,7 @@
 
 **Spec:** [Approved delivery 1A specification](spec.md).
 
-**Status:** Baseline approved on 2026-09-13; audit revision awaiting final Design review. The user authorized these documentation corrections and local commits, and explicitly approved TIME-02/03 in [context.md](context.md). Prior stack decisions remain active. The revised technical details and formal tasks must be approved before application implementation.
+**Status:** Approved on 2026-09-13, baseline and audit revision together. The user explicitly approved TIME-02/03 in [context.md](context.md), then approved this Design and the formal [tasks](tasks.md). Prior stack decisions remain active. Execute is authorized for local implementation and local commits; deployment, real-host and real-database changes remain separately authorized.
 
 **Boundary:** Creation and editing of pending tasks, fixed product time, server persistence, uniqueness, and original operation outcomes. No lifecycle commands from 1B, desktop implementation, metrics, or deadline-emphasis presentation are added.
 
@@ -22,7 +22,7 @@ flowchart LR
     storage --> database[("Local server database: tasks, configuration, outcomes")]
 ```
 
-The baseline process supervisor, API, SQLite settings and dependencies remain approved. The audit amendments below are ready for review; documentation commits do not authorize implementation or real-host/database changes.
+The baseline process supervisor, API, SQLite settings and dependencies remain approved, and the audit amendments below are approved with them. That approval covers local implementation; it does not authorize real-host or database changes.
 
 ### Architecture alternatives considered
 
@@ -366,6 +366,6 @@ Only qualifying project-level decisions belong in the active decision log; [AD-0
 ## Open questions
 
 - **Behavioral clarifications resolved:** TXT-01 uses user-perceived characters; TIME-01 uses the first repeated midnight or first valid instant when midnight is absent. TIME-02 extends this to an entirely skipped following date, and TIME-03 fixes the supported deadline range; both are explicitly approved in context.md. All original scenario examples and IDs remain; PCE-51/52 add the approved date-range checks.
-- **Audit revision awaiting final review:** The approved baseline remains the reference. Review the one-way input/domain dependency, standalone initializer, self-testable HTTP foundation, explicit request_id field, zero-argument runtime factory, packaged SQL smoke test and executable bootstrap gates before approving the revised task plan. No implementation task is authorized yet.
+- **Audit revision approved (2026-09-13):** the one-way input/domain dependency, standalone initializer, self-testable HTTP foundation, explicit request_id field, zero-argument runtime factory, packaged SQL smoke test and executable bootstrap gates are approved as part of this Design. The task plan is approved and its implementation tasks are authorized locally.
 - **Deployment values:** The target is the user's own Ubuntu server (confirmed 2026-09-13). The actual tailnet hostname, device access identifiers, installed interpreter/version set, and host paths must still be supplied by the user before deployment. Because validation happens on the real host rather than a disposable one, no step is performed until the user authorizes that specific step, and existing state is backed up before the first database initialization. Local work through the end of the task plan does not touch that host.
 - **Later features:** Windows client technology, its Windows-to-IANA zone mapping, visual refresh scheduling, and 1B's transition/deletion implementation remain with their respective designs.

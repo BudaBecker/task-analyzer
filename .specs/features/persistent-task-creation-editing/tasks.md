@@ -11,8 +11,8 @@ Implement these tasks with the `tlc-spec-driven` skill: **activate it by name an
 ---
 
 **Spec**: [spec.md](spec.md)
-**Design**: [design.md](design.md) (approved baseline; audit revision awaiting review)
-**Status**: Draft - audit corrections applied; revised Design review and task approval required
+**Design**: [design.md](design.md) (approved 2026-09-13, baseline and audit revision)
+**Status**: Approved 2026-09-13 - Execute authorized for local implementation and local commits
 
 ---
 

@@ -1,7 +1,7 @@
 # Persistent Task Creation and Editing Specification
 
 **Delivery:** 1A of the server lifecycle group.  
-**Phase:** Specify approved, including audit-time temporal clarifications; Design baseline approved with audit revision awaiting review; formal Tasks awaiting approval.
+**Phase:** Specify, Design and Tasks approved on 2026-09-13, including the audit-time temporal clarifications and the audit revision. Execute is authorized for local implementation and local commits.
 
 **Status:** Behavioral specification approved by the user. The delivery boundary was confirmed on 2026-09-13.
 
@@ -235,7 +235,7 @@ The following are verification obligations linked to existing criteria, not addi
 | REQ-031 | PCE-26, PCE-37 through PCE-43 | Server outcomes, lookup, and safe repetition for creation/edit. 1B extends operation coverage; desktop owns progress, 15 seconds, Retry sequencing, and presentation. | Tasks | In Tasks |
 | REQ-027 | PCE-46, PCE-47 | Server personal/private-access constraints. Design defines detailed setup; actual private-access evidence and the desktop scenario remain pending. | Tasks | In Tasks |
 
-**Coverage:** 9 active product IDs mapped to 52 acceptance criteria. All existing IDs and protected scenario inputs/outcomes are retained. PCE-08/09 and PCE-50 now reflect the audit clarifications explicitly approved by the user; PCE-51/52 add deadline-range criteria. PCE-48/49 preserve the earlier visual-counting and repeated-midnight clarifications. No requirement is marked Verified. A formal [task plan](tasks.md) exists and awaits approval; no application code or executable tests have been created. Every acceptance criterion must acquire requirement-derived tests and evidence during the authorized Tasks/Execute work; the Independent Test descriptions above are planned scenarios, not test results.
+**Coverage:** 9 active product IDs mapped to 52 acceptance criteria. All existing IDs and protected scenario inputs/outcomes are retained. PCE-08/09 and PCE-50 now reflect the audit clarifications explicitly approved by the user; PCE-51/52 add deadline-range criteria. PCE-48/49 preserve the earlier visual-counting and repeated-midnight clarifications. No requirement is marked Verified. The formal [task plan](tasks.md) is approved and Execute is authorized; no application code or executable tests exist yet at the time of this record. Every acceptance criterion must acquire requirement-derived tests and evidence during the authorized Tasks/Execute work; the Independent Test descriptions above are planned scenarios, not test results.
 
 The remaining active MVP requirements are allocated outside 1A: REQ-009 to 1B; REQ-021 through REQ-025 and REQ-033 to analysis/dashboard; REQ-026 to deadline emphasis/presentation; REQ-001, REQ-030, REQ-032, and REQ-035 to desktop work, with deletion's server effects in 1B; and REQ-034 to derived-result and desktop refresh work. Cross-feature scenarios must retain their original product IDs and expectations.
 
@@ -252,8 +252,8 @@ These are future completion conditions. The behavioral specification is approved
 
 ## Open questions
 
-No unresolved behavioral decision remains for 1A after the user-approved [temporal clarifications](context.md). The [Design](design.md) records the approved stack and baseline contracts plus the audit revision awaiting review; technical questions already resolved there are not reopened here.
+No unresolved behavioral decision remains for 1A after the user-approved [temporal clarifications](context.md). The [Design](design.md) records the approved stack, baseline contracts and approved audit revision; technical questions already resolved there are not reopened here.
 
-- Review the audit amendments to dependencies, protocol serialization, runtime startup, package verification and bootstrap gates, then approve the revised [tasks](tasks.md) before implementation.
+- **Resolved 2026-09-13:** the user approved the audit amendments to dependencies, protocol serialization, runtime startup, package verification and bootstrap gates, together with the revised [tasks](tasks.md). Implementation proceeds under that plan.
 - Confirm the actual target interpreter, paths and private-access values in an explicitly authorized deployment session. Local task completion cannot satisfy that external verification checkpoint.
 - Windows client technology and remaining 1B/analysis/desktop decisions belong to their respective designs.
