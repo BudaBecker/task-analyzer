@@ -1,8 +1,6 @@
 """Unit tests for JSON-line structured logging.
 
 Covers PCE-44; REQ-003.
-
-No test touches a database or any configured runtime path.
 """
 
 import json
@@ -33,12 +31,6 @@ FORBIDDEN_VALUES = {
 
 @pytest.fixture
 def restored_root_logger() -> Iterator[None]:
-    """Restore the root logger handlers and level after a test.
-
-    Yields:
-        None, while the test runs against a temporarily reconfigured
-        root logger.
-    """
     root = logging.getLogger()
     original_handlers = list(root.handlers)
     original_level = root.level
@@ -51,15 +43,6 @@ def restored_root_logger() -> Iterator[None]:
 
 
 def build_record(**extra: Any) -> logging.LogRecord:
-    """Build a logging record carrying the supplied extra attributes.
-
-    Args:
-        **extra: Attributes attached to the record, as ``logging``
-            attaches values passed through ``extra=``.
-
-    Returns:
-        The constructed record.
-    """
     record = logging.LogRecord(
         name="task_analyzer_server",
         level=logging.INFO,
@@ -75,7 +58,6 @@ def build_record(**extra: Any) -> logging.LogRecord:
 
 
 def test_record_serializes_as_one_json_object_per_line() -> None:
-    """A record renders as a single JSON object with the named fields."""
     record = build_record(
         request_id="c0ffee",
         operation_id="op-1",
@@ -101,7 +83,6 @@ def test_record_serializes_as_one_json_object_per_line() -> None:
 
 
 def test_optional_identifiers_are_omitted_when_absent() -> None:
-    """Operation and task identifiers appear only when supplied."""
     record = build_record(request_id="c0ffee", outcome="rejected")
 
     payload = json.loads(JsonLineFormatter().format(record))
@@ -113,7 +94,6 @@ def test_optional_identifiers_are_omitted_when_absent() -> None:
 
 
 def test_timestamp_is_a_utc_instant_with_six_fractional_digits() -> None:
-    """The timestamp renders as UTC with six digits and a Z suffix."""
     record = build_record()
     record.created = 1_757_721_600.123456
 
@@ -123,7 +103,6 @@ def test_timestamp_is_a_utc_instant_with_six_fractional_digits() -> None:
 
 
 def test_forbidden_content_is_never_emitted() -> None:
-    """Titles, observations, bodies, requests and secrets are dropped."""
     record = build_record(request_id="c0ffee", **FORBIDDEN_VALUES)
 
     line = JsonLineFormatter().format(record)
@@ -139,7 +118,6 @@ def test_forbidden_content_is_never_emitted() -> None:
 def test_duration_comes_from_the_monotonic_clock(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The reported duration tracks the monotonic clock, not real time."""
     monotonic_now = {"seconds": 100.0}
     monkeypatch.setattr(time, "monotonic", lambda: monotonic_now["seconds"])
 
@@ -150,7 +128,6 @@ def test_duration_comes_from_the_monotonic_clock(
 
 
 def test_formatting_failure_does_not_raise() -> None:
-    """An unserializable value yields a failure record, not an error."""
     record = build_record(request_id="c0ffee", duration_ms=object())
 
     line = JsonLineFormatter().format(record)
@@ -164,7 +141,6 @@ def test_formatting_failure_does_not_raise() -> None:
 def test_logging_an_unserializable_record_does_not_raise_to_the_caller(
     restored_root_logger: None, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A failing record still leaves the caller's control flow intact."""
     configure_logging("INFO")
 
     logging.getLogger("task_analyzer_server").info(
@@ -178,7 +154,6 @@ def test_logging_an_unserializable_record_does_not_raise_to_the_caller(
 def test_configure_logging_writes_json_lines(
     restored_root_logger: None, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Configured logging emits one approved JSON object per record."""
     configure_logging("INFO")
 
     logging.getLogger("task_analyzer_server").info(
@@ -197,7 +172,6 @@ def test_configure_logging_writes_json_lines(
 def test_configure_logging_applies_the_requested_level(
     restored_root_logger: None, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Records below the configured level are not emitted."""
     configure_logging("INFO")
 
     logging.getLogger("task_analyzer_server").debug("task_inspected")

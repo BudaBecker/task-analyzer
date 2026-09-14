@@ -1,20 +1,7 @@
 """Integration tests for concurrency and injected failures.
 
-Covers PCE-19, PCE-20, PCE-27, PCE-37, PCE-39, PCE-42, PCE-43;
-REQ-010, REQ-029, REQ-031.
-
-Overlapping work runs on independent connections: each service call
-opens its own, so two threads competing here compete the way two
-requests do. Nothing is synchronized by waiting a while. Threads meet on
-a barrier, and a helper process announces on its own pipe that it holds
-the write transaction, so every ordering this suite depends on is one
-the test established rather than one it hoped for.
-
-Stopping a process is a real stop. The helper is killed while its
-transaction is open, which leaves the database to recover exactly as it
-would after the server died mid-write.
-
-Disposable-database machinery is shared with the durability suite.
+Covers PCE-19, PCE-20, PCE-27, PCE-37, PCE-39, PCE-42, PCE-43; REQ-010,
+REQ-029, REQ-031.
 """
 
 import sqlite3
@@ -28,6 +15,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
+from helpers import FixedClock
 from test_durability import initialized_database
 
 from task_analyzer_server import services, storage
@@ -137,30 +125,9 @@ os._exit(9)
 '''
 
 
-class FixedClock:
-    """A clock reporting one instant, in one representation."""
-
-    def now(self) -> datetime:
-        """Read the fixed instant.
-
-        Returns:
-            The instant this clock always reports.
-        """
-        return SERVER_NOW
-
-
 def settings_for(
     database: Path, busy_timeout_ms: int = BUSY_TIMEOUT_MS
 ) -> ServerSettings:
-    """Build settings naming one disposable database.
-
-    Args:
-        database: Path of the disposable database.
-        busy_timeout_ms: Bounded wait for a busy lock.
-
-    Returns:
-        Settings for that file.
-    """
     return ServerSettings(
         database_path=database,
         log_level="INFO",
@@ -170,42 +137,19 @@ def settings_for(
 
 @pytest.fixture
 def database(tmp_path: Path) -> Path:
-    """Allocate a disposable database with the product zone fixed.
-
-    Args:
-        tmp_path: pytest-allocated temporary directory.
-
-    Returns:
-        Path of the newly created database file.
-    """
     target = initialized_database(tmp_path)
-    services.configure_zone(settings_for(target), FixedClock(), PRODUCT_ZONE)
+    services.configure_zone(
+        settings_for(target), FixedClock(SERVER_NOW), PRODUCT_ZONE
+    )
     return target
 
 
 @pytest.fixture
 def settings(database: Path) -> ServerSettings:
-    """Build settings naming the disposable database.
-
-    Args:
-        database: Path of the disposable database.
-
-    Returns:
-        Settings for that file.
-    """
     return settings_for(database)
 
 
 def creation(operation_id: UUID, payload: object) -> OperationRequest:
-    """Build one submitted creation operation.
-
-    Args:
-        operation_id: Identity of the attempt.
-        payload: The submitted task payload.
-
-    Returns:
-        The submitted operation and its envelope values.
-    """
     return OperationRequest(
         operation_id=operation_id,
         method="POST",
@@ -218,29 +162,10 @@ def run_together(
     first: Callable[[], OperationResult],
     second: Callable[[], OperationResult],
 ) -> tuple[object, object]:
-    """Run two attempts that enter the server at the same moment.
-
-    Both threads wait on one barrier and are released together, so the
-    overlap is established by the test rather than by timing.
-
-    Args:
-        first: The first attempt.
-        second: The second attempt.
-
-    Returns:
-        What each attempt produced, which is its result or the exception
-        it raised.
-    """
     barrier = threading.Barrier(2)
     outcomes: dict[int, object] = {}
 
     def run(index: int, attempt: Callable[[], OperationResult]) -> None:
-        """Run one attempt once both threads are ready.
-
-        Args:
-            index: Which attempt this is.
-            attempt: The attempt to run.
-        """
         barrier.wait()
         try:
             outcomes[index] = attempt()
@@ -262,23 +187,6 @@ def run_together(
 def holding_write_lock(
     database: Path, workspace: Path, operation_id: UUID, task_id: UUID
 ) -> Iterator["subprocess.Popen[str]"]:
-    """Run a helper that holds an uncommitted write transaction.
-
-    The helper announces readiness on its own pipe, so the block runs
-    only once the write lock is genuinely held.
-
-    Args:
-        database: The disposable database to lock.
-        workspace: Directory to write the helper program in.
-        operation_id: Identity the helper writes a result for.
-        task_id: Identity the helper writes a task for.
-
-    Yields:
-        The running helper process.
-
-    Raises:
-        AssertionError: If the helper never reports that it is ready.
-    """
     program = workspace / "hold_transaction.py"
     program.write_text(HOLDER_PROGRAM, encoding="utf-8")
     process = subprocess.Popen(
@@ -312,17 +220,6 @@ def holding_write_lock(
 def commit_then_stop(
     database: Path, workspace: Path, operation_id: UUID, title: str
 ) -> int:
-    """Run a helper that commits one creation and then stops.
-
-    Args:
-        database: The disposable database to write to.
-        workspace: Directory to write the helper program in.
-        operation_id: Identity of the attempt.
-        title: Title of the task to create.
-
-    Returns:
-        The exit code the helper stopped with.
-    """
     program = workspace / "commit_then_stop.py"
     program.write_text(COMMITTER_PROGRAM, encoding="utf-8")
     completed = subprocess.run(
@@ -347,15 +244,6 @@ def commit_then_stop(
 
 
 def counted(database: Path, statement: str) -> int:
-    """Count rows through a separate new connection.
-
-    Args:
-        database: Path of the disposable database.
-        statement: The counting statement to run.
-
-    Returns:
-        The counted rows.
-    """
     with storage.open_connection(database, BUSY_TIMEOUT_MS) as connection:
         return int(connection.execute(statement).fetchone()[0])
 
@@ -363,17 +251,6 @@ def counted(database: Path, statement: str) -> int:
 def accepted_and_rejected(
     outcomes: tuple[object, object],
 ) -> tuple[OperationResult, OperationResult]:
-    """Split two results into the accepted and the rejected one.
-
-    Args:
-        outcomes: What the two attempts produced.
-
-    Returns:
-        The accepted result and the rejected one.
-
-    Raises:
-        AssertionError: If the pair is not exactly one of each.
-    """
     results = [item for item in outcomes if isinstance(item, OperationResult)]
     assert len(results) == 2, f"Both attempts must settle: {outcomes}"
     succeeded = [item for item in results if item.outcome == "succeeded"]
@@ -386,16 +263,15 @@ def accepted_and_rejected(
 def test_two_copies_of_one_attempt_create_one_task(
     settings: ServerSettings, database: Path
 ) -> None:
-    """One attempt sent twice at once is applied once."""
     identity = uuid4()
     payload = {"title": TASK_TITLE, "deadline": DEADLINE}
 
     run_together(
         lambda: services.create_task(
-            settings, FixedClock(), creation(identity, payload)
+            settings, FixedClock(SERVER_NOW), creation(identity, payload)
         ),
         lambda: services.create_task(
-            settings, FixedClock(), creation(identity, payload)
+            settings, FixedClock(SERVER_NOW), creation(identity, payload)
         ),
     )
 
@@ -405,16 +281,15 @@ def test_two_copies_of_one_attempt_create_one_task(
 def test_two_copies_of_one_attempt_report_the_same_result(
     settings: ServerSettings,
 ) -> None:
-    """The second copy observes the first copy's terminal result."""
     identity = uuid4()
     payload = {"title": TASK_TITLE, "deadline": DEADLINE}
 
     first, second = run_together(
         lambda: services.create_task(
-            settings, FixedClock(), creation(identity, payload)
+            settings, FixedClock(SERVER_NOW), creation(identity, payload)
         ),
         lambda: services.create_task(
-            settings, FixedClock(), creation(identity, payload)
+            settings, FixedClock(SERVER_NOW), creation(identity, payload)
         ),
     )
 
@@ -427,16 +302,15 @@ def test_two_copies_of_one_attempt_report_the_same_result(
 def test_two_copies_of_one_attempt_retain_one_result(
     settings: ServerSettings, database: Path
 ) -> None:
-    """One attempt leaves one retained outcome, not two."""
     identity = uuid4()
     payload = {"title": TASK_TITLE}
 
     run_together(
         lambda: services.create_task(
-            settings, FixedClock(), creation(identity, payload)
+            settings, FixedClock(SERVER_NOW), creation(identity, payload)
         ),
         lambda: services.create_task(
-            settings, FixedClock(), creation(identity, payload)
+            settings, FixedClock(SERVER_NOW), creation(identity, payload)
         ),
     )
 
@@ -446,15 +320,14 @@ def test_two_copies_of_one_attempt_retain_one_result(
 def test_two_conflicting_operations_accept_one_task_at_most(
     settings: ServerSettings, database: Path
 ) -> None:
-    """Two different operations cannot both take one title and date."""
     payload = {"title": TASK_TITLE, "deadline": DEADLINE}
 
     outcomes = run_together(
         lambda: services.create_task(
-            settings, FixedClock(), creation(uuid4(), payload)
+            settings, FixedClock(SERVER_NOW), creation(uuid4(), payload)
         ),
         lambda: services.create_task(
-            settings, FixedClock(), creation(uuid4(), payload)
+            settings, FixedClock(SERVER_NOW), creation(uuid4(), payload)
         ),
     )
     accepted, _ = accepted_and_rejected(outcomes)
@@ -466,15 +339,14 @@ def test_two_conflicting_operations_accept_one_task_at_most(
 def test_the_refused_conflicting_operation_names_the_conflict(
     settings: ServerSettings,
 ) -> None:
-    """The refused operation is a uniqueness rejection, not a success."""
     payload = {"title": TASK_TITLE, "deadline": DEADLINE}
 
     outcomes = run_together(
         lambda: services.create_task(
-            settings, FixedClock(), creation(uuid4(), payload)
+            settings, FixedClock(SERVER_NOW), creation(uuid4(), payload)
         ),
         lambda: services.create_task(
-            settings, FixedClock(), creation(uuid4(), payload)
+            settings, FixedClock(SERVER_NOW), creation(uuid4(), payload)
         ),
     )
     accepted, rejected = accepted_and_rejected(outcomes)
@@ -488,17 +360,16 @@ def test_the_refused_conflicting_operation_names_the_conflict(
 def test_a_conflicting_operation_is_not_treated_as_a_replay(
     settings: ServerSettings, database: Path
 ) -> None:
-    """A matching title never makes one operation another's repetition."""
     first_id = uuid4()
     second_id = uuid4()
     payload = {"title": TASK_TITLE, "deadline": DEADLINE}
 
     outcomes = run_together(
         lambda: services.create_task(
-            settings, FixedClock(), creation(first_id, payload)
+            settings, FixedClock(SERVER_NOW), creation(first_id, payload)
         ),
         lambda: services.create_task(
-            settings, FixedClock(), creation(second_id, payload)
+            settings, FixedClock(SERVER_NOW), creation(second_id, payload)
         ),
     )
     accepted, rejected = accepted_and_rejected(outcomes)
@@ -513,7 +384,6 @@ def test_a_conflicting_operation_is_not_treated_as_a_replay(
 def test_a_stop_before_commit_leaves_no_committed_task(
     database: Path, tmp_path: Path
 ) -> None:
-    """Work that never committed leaves no task behind."""
     with holding_write_lock(database, tmp_path, uuid4(), uuid4()):
         pass
 
@@ -523,7 +393,6 @@ def test_a_stop_before_commit_leaves_no_committed_task(
 def test_a_stop_before_commit_leaves_no_committed_result(
     database: Path, tmp_path: Path
 ) -> None:
-    """Work that never committed leaves no outcome behind either."""
     with holding_write_lock(database, tmp_path, uuid4(), uuid4()):
         pass
 
@@ -533,13 +402,14 @@ def test_a_stop_before_commit_leaves_no_committed_result(
 def test_the_same_attempt_still_settles_after_a_stop(
     settings: ServerSettings, database: Path, tmp_path: Path
 ) -> None:
-    """Repeating the stopped attempt can still establish its result."""
     identity = uuid4()
     with holding_write_lock(database, tmp_path, identity, uuid4()):
         pass
 
     result = services.create_task(
-        settings, FixedClock(), creation(identity, {"title": TASK_TITLE})
+        settings,
+        FixedClock(SERVER_NOW),
+        creation(identity, {"title": TASK_TITLE}),
     )
 
     assert result.outcome == "succeeded"
@@ -550,7 +420,6 @@ def test_the_same_attempt_still_settles_after_a_stop(
 def test_an_outcome_committed_before_a_stop_is_discoverable(
     settings: ServerSettings, database: Path, tmp_path: Path
 ) -> None:
-    """A response nobody received does not undo what was committed."""
     identity = uuid4()
 
     commit_then_stop(database, tmp_path, identity, TASK_TITLE)
@@ -564,13 +433,14 @@ def test_an_outcome_committed_before_a_stop_is_discoverable(
 def test_a_committed_outcome_is_not_applied_twice(
     settings: ServerSettings, database: Path, tmp_path: Path
 ) -> None:
-    """Repeating an attempt that already committed changes nothing."""
     identity = uuid4()
     commit_then_stop(database, tmp_path, identity, TASK_TITLE)
     retained = services.lookup_operation(settings, identity)
 
     repeated = services.create_task(
-        settings, FixedClock(), creation(identity, {"title": TASK_TITLE})
+        settings,
+        FixedClock(SERVER_NOW),
+        creation(identity, {"title": TASK_TITLE}),
     )
 
     assert repeated == retained
@@ -581,14 +451,13 @@ def test_a_committed_outcome_is_not_applied_twice(
 def test_a_lock_timeout_is_an_infrastructure_failure(
     database: Path, tmp_path: Path
 ) -> None:
-    """A writer that cannot take the lock reports that, not an outcome."""
     impatient = settings_for(database, IMPATIENT_TIMEOUT_MS)
 
     with holding_write_lock(database, tmp_path, uuid4(), uuid4()):
         with pytest.raises(sqlite3.OperationalError) as failure:
             services.create_task(
                 impatient,
-                FixedClock(),
+                FixedClock(SERVER_NOW),
                 creation(uuid4(), {"title": OTHER_TITLE}),
             )
 
@@ -598,7 +467,6 @@ def test_a_lock_timeout_is_an_infrastructure_failure(
 def test_a_lock_timeout_establishes_no_terminal_result(
     database: Path, tmp_path: Path
 ) -> None:
-    """The blocked attempt leaves nothing retained under its identity."""
     impatient = settings_for(database, IMPATIENT_TIMEOUT_MS)
     identity = uuid4()
 
@@ -606,7 +474,7 @@ def test_a_lock_timeout_establishes_no_terminal_result(
         with pytest.raises(sqlite3.OperationalError):
             services.create_task(
                 impatient,
-                FixedClock(),
+                FixedClock(SERVER_NOW),
                 creation(identity, {"title": OTHER_TITLE}),
             )
 
@@ -617,7 +485,6 @@ def test_a_lock_timeout_establishes_no_terminal_result(
 def test_lookup_during_in_flight_work_is_unknown_not_rejected(
     settings: ServerSettings, database: Path, tmp_path: Path
 ) -> None:
-    """While work is in flight its outcome is unknown, never refused."""
     identity = uuid4()
 
     with holding_write_lock(database, tmp_path, identity, uuid4()):

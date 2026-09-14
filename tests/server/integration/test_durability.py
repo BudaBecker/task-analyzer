@@ -1,23 +1,6 @@
 """Integration tests for durability across restarts and sessions.
 
 Covers PCE-34, PCE-35, PCE-36; REQ-010, REQ-028.
-
-Every restart here is a real one: the server process is stopped and a
-new process is started against the same newly allocated temporary
-database file. The database path is always passed explicitly to that
-process and any inherited runtime path is removed from its environment,
-so no test can reach a configured runtime database.
-
-**What a passing run does and does not prove.** These tests prove that
-confirmed state survives a process restart: the server keeps nothing it
-reported in memory only. They are not evidence of physical power-loss
-durability. That depends on filesystem and device synchronization
-semantics on the actual host, which no process-level test observes. The
-approved connection policy states the intent; a power-loss claim needs
-its own evidence on the real hardware.
-
-These helpers are shared with the concurrency suite, which needs the
-same disposable-database and process machinery.
 """
 
 import os
@@ -65,43 +48,18 @@ DEADLINE = "2026-09-14"
 
 
 def free_port() -> int:
-    """Allocate a free loopback port for one test server.
-
-    Returns:
-        A port number nothing is listening on.
-    """
     with closing(socket.socket()) as probe:
         probe.bind((HOST, 0))
         return int(probe.getsockname()[1])
 
 
 def initialized_database(directory: Path) -> Path:
-    """Create one disposable database in a temporary directory.
-
-    Args:
-        directory: pytest-allocated temporary directory.
-
-    Returns:
-        Path of the newly created database file.
-    """
     target = directory / "disposable.sqlite3"
     schema.initialize_database(target)
     return target
 
 
 def server_environment(database: Path) -> dict[str, str]:
-    """Build the environment one disposable server process runs with.
-
-    Any inherited database path is dropped before the disposable one is
-    set, so a stray runtime value in the developer's environment cannot
-    become the database a test writes to.
-
-    Args:
-        database: The disposable database file to serve.
-
-    Returns:
-        The environment variables for that process.
-    """
     environment = {
         name: value
         for name, value in os.environ.items()
@@ -114,15 +72,6 @@ def server_environment(database: Path) -> dict[str, str]:
 
 @contextmanager
 def running_server(database: Path, workspace: Path) -> Iterator[str]:
-    """Run one server process against one disposable database.
-
-    Args:
-        database: The disposable database file to serve.
-        workspace: Directory to run the server in.
-
-    Yields:
-        The base URL the started server answers on.
-    """
     port = free_port()
     log = workspace / f"server-{port}.log"
     with log.open("wb") as sink:
@@ -152,11 +101,6 @@ def running_server(database: Path, workspace: Path) -> Iterator[str]:
 
 
 def stop(process: "subprocess.Popen[bytes]") -> None:
-    """Stop a started process, whatever the test did.
-
-    Args:
-        process: The process to stop.
-    """
     if process.poll() is None:
         process.terminate()
     try:
@@ -169,16 +113,6 @@ def stop(process: "subprocess.Popen[bytes]") -> None:
 def _await_readiness(
     process: "subprocess.Popen[bytes]", base_url: str, log: Path
 ) -> None:
-    """Wait, with a bound, until the started server answers.
-
-    Args:
-        process: The started server process.
-        base_url: The base URL it should answer on.
-        log: File the server's output is written to.
-
-    Raises:
-        AssertionError: If the process exits first or the bound passes.
-    """
     deadline = time.monotonic() + READINESS_TIMEOUT_SECONDS
     with httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:
         while time.monotonic() < deadline:
@@ -202,15 +136,6 @@ def _await_readiness(
 
 
 def configure(base_url: str, zone_key: str = PRODUCT_ZONE) -> None:
-    """Fix the product zone on a running server.
-
-    Args:
-        base_url: The base URL the server answers on.
-        zone_key: The IANA key to fix.
-
-    Raises:
-        AssertionError: If setup was not accepted.
-    """
     with httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:
         response = client.put(
             f"{base_url}{CONFIGURATION_ROUTE}",
@@ -222,16 +147,6 @@ def configure(base_url: str, zone_key: str = PRODUCT_ZONE) -> None:
 def create(
     base_url: str, payload: object, operation_id: UUID | None = None
 ) -> httpx.Response:
-    """Create one task on a running server.
-
-    Args:
-        base_url: The base URL the server answers on.
-        payload: The submitted task payload.
-        operation_id: Identity to submit, generated when omitted.
-
-    Returns:
-        The server's response.
-    """
     identity = uuid4() if operation_id is None else operation_id
     with httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:
         return client.post(
@@ -242,16 +157,6 @@ def create(
 
 
 def edit(base_url: str, task_id: str, payload: object) -> httpx.Response:
-    """Edit one task on a running server.
-
-    Args:
-        base_url: The base URL the server answers on.
-        task_id: Identity of the task to edit.
-        payload: The submitted editable form state.
-
-    Returns:
-        The server's response.
-    """
     with httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:
         return client.put(
             f"{base_url}{TASKS_ROUTE}/{task_id}",
@@ -261,61 +166,21 @@ def edit(base_url: str, task_id: str, payload: object) -> httpx.Response:
 
 
 def read(base_url: str, route: str) -> httpx.Response:
-    """Read one route through a brand new client session.
-
-    A new client is built for every reading, so nothing a previous
-    session held can take part in the answer.
-
-    Args:
-        base_url: The base URL the server answers on.
-        route: The route to read.
-
-    Returns:
-        The server's response.
-    """
     with httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:
         return client.get(f"{base_url}{route}")
 
 
 def only_task(base_url: str) -> dict[str, object]:
-    """Read the single managed task of a server.
-
-    Args:
-        base_url: The base URL the server answers on.
-
-    Returns:
-        That task's snapshot.
-
-    Raises:
-        AssertionError: If the collection does not hold exactly one.
-    """
     items = read(base_url, TASKS_ROUTE).json()["items"]
     assert len(items) == 1
     return dict(items[0])
 
 
 def product_date_of(body: dict[str, object]) -> date:
-    """Read the product date a reading published.
-
-    Args:
-        body: The parsed reading.
-
-    Returns:
-        The published product date.
-    """
     return date.fromisoformat(str(body["product_date"]))
 
 
 def expected_product_date(body: dict[str, object], zone_key: str) -> date:
-    """Derive the product date of a reading's own sampled instant.
-
-    Args:
-        body: The parsed reading.
-        zone_key: The IANA key to read that instant in.
-
-    Returns:
-        The product date that instant falls on in the zone.
-    """
     sampled = datetime.fromisoformat(
         str(body["server_now"]).replace("Z", "+00:00")
     )
@@ -324,21 +189,12 @@ def expected_product_date(body: dict[str, object], zone_key: str) -> date:
 
 @pytest.fixture
 def database(tmp_path: Path) -> Path:
-    """Allocate a disposable initialized database.
-
-    Args:
-        tmp_path: pytest-allocated temporary directory.
-
-    Returns:
-        Path of the newly created database file.
-    """
     return initialized_database(tmp_path)
 
 
 def test_a_created_task_survives_a_new_server_process(
     database: Path, tmp_path: Path
 ) -> None:
-    """A creation confirmed as persisted outlives its server."""
     with running_server(database, tmp_path) as first:
         configure(first)
         created = create(first, {"title": ORIGINAL_TITLE})
@@ -352,7 +208,6 @@ def test_a_created_task_survives_a_new_server_process(
 def test_a_created_task_is_unchanged_by_the_restart(
     database: Path, tmp_path: Path
 ) -> None:
-    """Every stored field is exactly what the creation reported."""
     with running_server(database, tmp_path) as first:
         configure(first)
         created = create(
@@ -372,7 +227,6 @@ def test_a_created_task_is_unchanged_by_the_restart(
 def test_an_edited_task_survives_a_new_server_process(
     database: Path, tmp_path: Path
 ) -> None:
-    """A pending edit confirmed as persisted outlives its server."""
     with running_server(database, tmp_path) as first:
         configure(first)
         created = create(first, {"title": ORIGINAL_TITLE})
@@ -392,7 +246,6 @@ def test_an_edited_task_survives_a_new_server_process(
 def test_an_edit_keeps_identity_and_creation_time_across_a_restart(
     database: Path, tmp_path: Path
 ) -> None:
-    """A restart does not move what an edit never touched."""
     with running_server(database, tmp_path) as first:
         configure(first)
         created = create(first, {"title": ORIGINAL_TITLE}).json()["task"]
@@ -408,7 +261,6 @@ def test_an_edit_keeps_identity_and_creation_time_across_a_restart(
 def test_the_configured_product_zone_survives_a_restart(
     database: Path, tmp_path: Path
 ) -> None:
-    """Setup is fixed once and a new process finds it fixed."""
     with running_server(database, tmp_path) as first:
         configure(first)
     with running_server(database, tmp_path) as second:
@@ -421,12 +273,6 @@ def test_the_configured_product_zone_survives_a_restart(
 def test_deadline_interpretation_still_uses_the_retained_zone(
     tmp_path: Path,
 ) -> None:
-    """The product date follows each retained zone after a restart.
-
-    The two zones are 25 hours apart, so their product dates differ at
-    every instant. A server that fell back to UTC, or to the host's own
-    zone, would report the same date for both.
-    """
     east_home = tmp_path / "east"
     west_home = tmp_path / "west"
     east_home.mkdir()
@@ -455,7 +301,6 @@ def test_deadline_interpretation_still_uses_the_retained_zone(
 def test_a_fresh_client_session_reads_the_persisted_state(
     database: Path, tmp_path: Path
 ) -> None:
-    """A new session needs nothing the previous one held."""
     with running_server(database, tmp_path) as first:
         configure(first)
         created = create(first, {"title": ORIGINAL_TITLE})
@@ -472,7 +317,6 @@ def test_a_fresh_client_session_reads_the_persisted_state(
 def test_the_original_operation_outcome_is_consultable_after_a_restart(
     database: Path, tmp_path: Path
 ) -> None:
-    """A retained outcome is still the answer a new process gives."""
     identity = uuid4()
 
     with running_server(database, tmp_path) as first:
@@ -488,7 +332,6 @@ def test_the_original_operation_outcome_is_consultable_after_a_restart(
 def test_the_restarted_server_accepts_new_work_on_persisted_state(
     database: Path, tmp_path: Path
 ) -> None:
-    """A restart resumes the collection instead of replacing it."""
     with running_server(database, tmp_path) as first:
         configure(first)
         create(first, {"title": ORIGINAL_TITLE})
@@ -507,7 +350,6 @@ def test_a_disposable_server_never_falls_back_to_a_runtime_database(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A configured runtime path cannot become a test's database."""
     monkeypatch.setenv(DATABASE_PATH_VARIABLE, "C:/runtime/production.db")
 
     environment = server_environment(database)

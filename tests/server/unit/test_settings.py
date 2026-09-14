@@ -1,10 +1,6 @@
 """Unit tests for validated runtime settings.
 
 Covers PCE-44 and PCE-45; REQ-003.
-
-Every case supplies its own environment mapping or a disposable
-``tmp_path`` file. No test reads or falls back to a configured runtime
-``TASK_ANALYZER_DATABASE_PATH``.
 """
 
 from pathlib import Path
@@ -21,19 +17,10 @@ from task_analyzer_server.settings import (
 
 
 def disposable_environment(tmp_path: Path) -> dict[str, str]:
-    """Build a minimal environment pointing at a disposable database.
-
-    Args:
-        tmp_path: pytest-allocated temporary directory.
-
-    Returns:
-        A mapping holding only the required database path.
-    """
     return {DATABASE_PATH_VARIABLE: str(tmp_path / "disposable.sqlite3")}
 
 
 def test_missing_database_path_is_rejected() -> None:
-    """An absent database path fails and names the variable."""
     with pytest.raises(SettingsError) as failure:
         ServerSettings.from_environment({})
 
@@ -41,7 +28,6 @@ def test_missing_database_path_is_rejected() -> None:
 
 
 def test_relative_database_path_is_rejected() -> None:
-    """A relative database path fails and names the variable."""
     environment = {DATABASE_PATH_VARIABLE: "data/task-analyzer.sqlite3"}
 
     with pytest.raises(SettingsError) as failure:
@@ -51,7 +37,6 @@ def test_relative_database_path_is_rejected() -> None:
 
 
 def test_absolute_database_path_is_accepted(tmp_path: Path) -> None:
-    """An absolute database path is kept exactly as supplied."""
     expected = tmp_path / "disposable.sqlite3"
 
     settings = ServerSettings.from_environment(
@@ -62,7 +47,6 @@ def test_absolute_database_path_is_accepted(tmp_path: Path) -> None:
 
 
 def test_log_level_defaults_to_info(tmp_path: Path) -> None:
-    """An unset logging level resolves to INFO."""
     settings = ServerSettings.from_environment(
         disposable_environment(tmp_path)
     )
@@ -71,7 +55,6 @@ def test_log_level_defaults_to_info(tmp_path: Path) -> None:
 
 
 def test_explicit_log_level_is_used(tmp_path: Path) -> None:
-    """A supplied standard level name replaces the default."""
     environment = disposable_environment(tmp_path)
     environment[LOG_LEVEL_VARIABLE] = "DEBUG"
 
@@ -81,7 +64,6 @@ def test_explicit_log_level_is_used(tmp_path: Path) -> None:
 
 
 def test_log_level_resolves_to_the_canonical_name(tmp_path: Path) -> None:
-    """A standard level name resolves to its canonical upper-case form."""
     environment = disposable_environment(tmp_path)
     environment[LOG_LEVEL_VARIABLE] = "debug"
 
@@ -91,7 +73,6 @@ def test_log_level_resolves_to_the_canonical_name(tmp_path: Path) -> None:
 
 
 def test_invalid_log_level_is_rejected(tmp_path: Path) -> None:
-    """An unknown level fails instead of being coerced to the default."""
     environment = disposable_environment(tmp_path)
     environment[LOG_LEVEL_VARIABLE] = "VERBOSE"
 
@@ -102,7 +83,6 @@ def test_invalid_log_level_is_rejected(tmp_path: Path) -> None:
 
 
 def test_busy_timeout_defaults_to_five_thousand(tmp_path: Path) -> None:
-    """An unset busy timeout resolves to 5000 milliseconds."""
     settings = ServerSettings.from_environment(
         disposable_environment(tmp_path)
     )
@@ -111,7 +91,6 @@ def test_busy_timeout_defaults_to_five_thousand(tmp_path: Path) -> None:
 
 
 def test_explicit_busy_timeout_is_used(tmp_path: Path) -> None:
-    """A supplied whole-number timeout replaces the default."""
     environment = disposable_environment(tmp_path)
     environment[DB_BUSY_TIMEOUT_VARIABLE] = "1000"
 
@@ -121,7 +100,6 @@ def test_explicit_busy_timeout_is_used(tmp_path: Path) -> None:
 
 
 def test_non_numeric_busy_timeout_is_rejected(tmp_path: Path) -> None:
-    """Text that is not a number fails instead of being coerced."""
     environment = disposable_environment(tmp_path)
     environment[DB_BUSY_TIMEOUT_VARIABLE] = "soon"
 
@@ -132,7 +110,6 @@ def test_non_numeric_busy_timeout_is_rejected(tmp_path: Path) -> None:
 
 
 def test_negative_busy_timeout_is_rejected(tmp_path: Path) -> None:
-    """A negative timeout fails instead of being coerced."""
     environment = disposable_environment(tmp_path)
     environment[DB_BUSY_TIMEOUT_VARIABLE] = "-250"
 
@@ -143,7 +120,6 @@ def test_negative_busy_timeout_is_rejected(tmp_path: Path) -> None:
 
 
 def test_zero_busy_timeout_is_rejected(tmp_path: Path) -> None:
-    """A zero timeout fails because the lock wait must stay bounded."""
     environment = disposable_environment(tmp_path)
     environment[DB_BUSY_TIMEOUT_VARIABLE] = "0"
 
@@ -156,7 +132,6 @@ def test_zero_busy_timeout_is_rejected(tmp_path: Path) -> None:
 def test_process_environment_is_read_without_an_argument(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The zero-argument call reads the process environment."""
     expected = tmp_path / "disposable.sqlite3"
     monkeypatch.setenv(DATABASE_PATH_VARIABLE, str(expected))
     monkeypatch.delenv(LOG_LEVEL_VARIABLE, raising=False)

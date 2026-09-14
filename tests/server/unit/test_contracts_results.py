@@ -2,9 +2,6 @@
 
 Covers PCE-26, PCE-38, PCE-40, PCE-41 and PCE-43; REQ-010, REQ-029,
 REQ-031.
-
-The persisted creation result recorded in the approved design is
-asserted field for field, so the published shape cannot drift from it.
 """
 
 import json
@@ -60,14 +57,6 @@ DESIGN_EXAMPLE_RESULT: dict[str, Any] = {
 
 
 def created_snapshot(**overrides: Any) -> TaskSnapshot:
-    """Build the design example's created task snapshot.
-
-    Args:
-        **overrides: Field values replacing the example's own.
-
-    Returns:
-        The snapshot of a task created by this delivery.
-    """
     fields: dict[str, Any] = {
         "task_id": TASK_ID,
         "title": "Read notes",
@@ -82,11 +71,6 @@ def created_snapshot(**overrides: Any) -> TaskSnapshot:
 
 
 def created_result() -> OperationResult:
-    """Build the design example's persisted creation result.
-
-    Returns:
-        The stored result of an accepted creation.
-    """
     return OperationResult(
         operation_id=OPERATION_ID,
         outcome="succeeded",
@@ -98,7 +82,6 @@ def created_result() -> OperationResult:
 
 
 def test_task_snapshot_exposes_exactly_the_contract_fields() -> None:
-    """A snapshot publishes the seven approved fields and no others."""
     expected = {
         "task_id",
         TITLE_FIELD,
@@ -118,17 +101,11 @@ def test_task_snapshot_exposes_exactly_the_contract_fields() -> None:
     ["title_key", "is_deleted", "created_at_us", "latest_completed_at_us"],
 )
 def test_task_snapshot_refuses_internal_fields(internal_field: str) -> None:
-    """Comparison and deletion fields never reach the contract.
-
-    Args:
-        internal_field: A storage-only column name.
-    """
     with pytest.raises(ValidationError):
         created_snapshot(**{internal_field: "x"})
 
 
 def test_created_task_is_pending_with_no_completion_time() -> None:
-    """This delivery creates pending tasks that were never completed."""
     published = created_snapshot().model_dump(mode="json")
 
     assert published["status"] == "pending"
@@ -136,7 +113,6 @@ def test_created_task_is_pending_with_no_completion_time() -> None:
 
 
 def test_task_identity_publishes_as_canonical_lowercase_text() -> None:
-    """Identities are canonical lowercase hyphenated UUID text."""
     snapshot = created_snapshot(
         task_id=UUID("20000000-0000-4000-8000-00000000000A")
     )
@@ -147,14 +123,12 @@ def test_task_identity_publishes_as_canonical_lowercase_text() -> None:
 
 
 def test_deadline_publishes_as_a_calendar_date() -> None:
-    """Deadlines cross the wire as YYYY-MM-DD."""
     snapshot = created_snapshot(deadline=date(1, 1, 1))
 
     assert snapshot.model_dump(mode="json")[DEADLINE_FIELD] == "0001-01-01"
 
 
 def test_observations_keep_their_line_breaks() -> None:
-    """Published observations are the submitted text, unchanged."""
     supplied = "first line\nsecond line"
 
     snapshot = created_snapshot(observations=supplied)
@@ -163,14 +137,12 @@ def test_observations_keep_their_line_breaks() -> None:
 
 
 def test_instants_publish_with_z_and_six_fractional_digits() -> None:
-    """A whole-second instant still shows six fractional digits."""
     published = created_snapshot().model_dump(mode="json")
 
     assert published["created_at"] == "2026-09-13T12:00:00.000000Z"
 
 
 def test_instants_keep_every_microsecond() -> None:
-    """Sub-second precision survives the wire format."""
     snapshot = created_snapshot(
         created_at=datetime(2026, 9, 13, 12, 0, 0, 123456, tzinfo=UTC)
     )
@@ -182,7 +154,6 @@ def test_instants_keep_every_microsecond() -> None:
 
 
 def test_an_instant_in_another_zone_publishes_in_utc() -> None:
-    """The same moment publishes as UTC whatever zone it arrives in."""
     snapshot = created_snapshot(
         created_at=datetime(2026, 9, 13, 9, 0, tzinfo=SAO_PAULO)
     )
@@ -194,13 +165,11 @@ def test_an_instant_in_another_zone_publishes_in_utc() -> None:
 
 
 def test_a_naive_instant_is_refused() -> None:
-    """An instant with no offset is never published as UTC."""
     with pytest.raises(ValidationError):
         created_snapshot(created_at=datetime(2026, 9, 13, 12, 0))
 
 
 def test_unconfigured_view_reports_no_zone_and_no_product_date() -> None:
-    """Before setup the view is usable and reports nothing configured."""
     view = ConfigurationView(
         configured=False,
         product_time_zone=None,
@@ -217,7 +186,6 @@ def test_unconfigured_view_reports_no_zone_and_no_product_date() -> None:
 
 
 def test_configured_view_reports_the_retained_zone_and_date() -> None:
-    """After setup the view carries the fixed zone and product date."""
     view = ConfigurationView(
         configured=True,
         product_time_zone="America/Sao_Paulo",
@@ -234,7 +202,6 @@ def test_configured_view_reports_the_retained_zone_and_date() -> None:
 
 
 def test_an_empty_collection_publishes_an_empty_items_array() -> None:
-    """No managed task means an empty array, never a missing field."""
     view = TaskListView(
         items=(),
         product_time_zone="America/Sao_Paulo",
@@ -246,7 +213,6 @@ def test_an_empty_collection_publishes_an_empty_items_array() -> None:
 
 
 def test_a_task_list_carries_its_items_and_time_context() -> None:
-    """One reading publishes its tasks with one sampled server time."""
     view = TaskListView(
         items=(created_snapshot(),),
         product_time_zone="America/Sao_Paulo",
@@ -263,7 +229,6 @@ def test_a_task_list_carries_its_items_and_time_context() -> None:
 
 
 def test_a_successful_result_carries_its_task_and_no_error() -> None:
-    """A success publishes the resulting task snapshot alone."""
     result = created_result()
 
     assert result.task is not None
@@ -272,7 +237,6 @@ def test_a_successful_result_carries_its_task_and_no_error() -> None:
 
 
 def test_a_rejected_result_carries_its_error_and_no_task() -> None:
-    """A rejection publishes the error alone."""
     result = OperationResult(
         operation_id=OPERATION_ID,
         outcome="rejected",
@@ -288,7 +252,6 @@ def test_a_rejected_result_carries_its_error_and_no_task() -> None:
 
 
 def test_a_result_carrying_both_a_task_and_an_error_is_refused() -> None:
-    """A result never claims a task and a rejection at once."""
     with pytest.raises(ValidationError):
         OperationResult(
             operation_id=OPERATION_ID,
@@ -301,7 +264,6 @@ def test_a_result_carrying_both_a_task_and_an_error_is_refused() -> None:
 
 
 def test_a_result_carrying_neither_a_task_nor_an_error_is_refused() -> None:
-    """A result never settles an operation without saying how."""
     with pytest.raises(ValidationError):
         OperationResult(
             operation_id=OPERATION_ID,
@@ -314,7 +276,6 @@ def test_a_result_carrying_neither_a_task_nor_an_error_is_refused() -> None:
 
 
 def test_a_non_field_error_publishes_an_empty_fields_array() -> None:
-    """An error that is not about a field still publishes an array."""
     error = OperationError(code=ErrorCode.TASK_NOT_FOUND)
 
     assert error.model_dump(mode="json") == {
@@ -325,7 +286,6 @@ def test_a_non_field_error_publishes_an_empty_fields_array() -> None:
 
 
 def test_a_field_error_publishes_field_and_code_pairs() -> None:
-    """A validation rejection names each field and its code."""
     error = OperationError(
         code=ErrorCode.TASK_VALIDATION_FAILED,
         fields=(
@@ -345,7 +305,6 @@ def test_a_field_error_publishes_field_and_code_pairs() -> None:
 
 
 def test_a_uniqueness_rejection_identifies_the_conflicting_task() -> None:
-    """A uniqueness rejection names the task it collided with."""
     error = OperationError(
         code=ErrorCode.TASK_UNIQUENESS_CONFLICT,
         conflicting_task_id=CONFLICTING_TASK_ID,
@@ -359,7 +318,6 @@ def test_a_uniqueness_rejection_identifies_the_conflicting_task() -> None:
 
 
 def test_a_stored_uniqueness_rejection_reads_back_unchanged() -> None:
-    """Consulting a uniqueness rejection returns that same rejection."""
     stored = OperationResult(
         operation_id=OPERATION_ID,
         outcome="rejected",
@@ -380,7 +338,6 @@ def test_a_stored_uniqueness_rejection_reads_back_unchanged() -> None:
 
 
 def test_a_stored_creation_result_reads_back_unchanged() -> None:
-    """A lost response is answered with the original stored result."""
     stored = created_result()
 
     read_back = OperationResult.model_validate_json(stored.model_dump_json())
@@ -390,7 +347,6 @@ def test_a_stored_creation_result_reads_back_unchanged() -> None:
 
 
 def test_a_protocol_error_publishes_exactly_its_contract_fields() -> None:
-    """A protocol error carries a request identity and its error."""
     error = ProtocolError(
         request_id=REQUEST_ID,
         error=ProtocolErrorDetail(code=ErrorCode.INVALID_OPERATION_ENVELOPE),
@@ -403,7 +359,6 @@ def test_a_protocol_error_publishes_exactly_its_contract_fields() -> None:
 
 
 def test_a_protocol_error_omits_an_unsupplied_operation_identity() -> None:
-    """Without a usable identity the field is absent, not null."""
     error = ProtocolError(
         request_id=REQUEST_ID,
         error=ProtocolErrorDetail(code=ErrorCode.INVALID_OPERATION_ENVELOPE),
@@ -413,7 +368,6 @@ def test_a_protocol_error_omits_an_unsupplied_operation_identity() -> None:
 
 
 def test_a_protocol_error_carries_a_usable_operation_identity() -> None:
-    """A reused identity is named so the desktop can consult it."""
     error = ProtocolError(
         request_id=REQUEST_ID,
         error=ProtocolErrorDetail(code=ErrorCode.OPERATION_ID_REUSED),
@@ -426,7 +380,6 @@ def test_a_protocol_error_carries_a_usable_operation_identity() -> None:
 
 
 def test_a_protocol_error_never_carries_a_terminal_outcome() -> None:
-    """A protocol error is distinguishable from a stored rejection."""
     error = ProtocolError(
         request_id=REQUEST_ID,
         error=ProtocolErrorDetail(code=ErrorCode.STORAGE_UNAVAILABLE),
@@ -440,7 +393,6 @@ def test_a_protocol_error_never_carries_a_terminal_outcome() -> None:
 
 
 def test_a_protocol_error_request_id_is_nonempty_canonical_text() -> None:
-    """The request identity correlates the response with the log."""
     error = ProtocolError(
         request_id=REQUEST_ID,
         error=ProtocolErrorDetail(code=ErrorCode.INTERNAL_ERROR),
@@ -455,7 +407,6 @@ def test_a_protocol_error_request_id_is_nonempty_canonical_text() -> None:
 def test_the_design_example_creation_result_serializes_field_for_field() -> (
     None
 ):
-    """The persisted creation result matches the approved example."""
     assert created_result().model_dump(mode="json") == DESIGN_EXAMPLE_RESULT
     assert json.loads(created_result().model_dump_json()) == (
         DESIGN_EXAMPLE_RESULT
@@ -463,7 +414,6 @@ def test_the_design_example_creation_result_serializes_field_for_field() -> (
 
 
 def test_stable_operation_and_protocol_error_codes() -> None:
-    """The published codes keep their exact contract spelling."""
     assert {code.value for code in ErrorCode} == {
         "TASK_VALIDATION_FAILED",
         "TASK_UNIQUENESS_CONFLICT",

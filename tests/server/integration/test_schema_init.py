@@ -1,10 +1,6 @@
 """Integration tests for the explicit database initializer.
 
 Covers PCE-34, PCE-35, PCE-45; REQ-003, REQ-010, REQ-028.
-
-Every test targets a newly allocated temporary path. No test reads
-``TASK_ANALYZER_DATABASE_PATH`` or touches any configured runtime
-database.
 """
 
 import ast
@@ -27,11 +23,6 @@ EXPECTED_TABLES = [
 
 
 def package_module_sources() -> dict[str, str]:
-    """Read the source of every top-level module in the package.
-
-    Returns:
-        A mapping of file name to source text.
-    """
     package_files = resources.files(schema.PACKAGE_NAME)
     return {
         entry.name: entry.read_text(encoding="utf-8")
@@ -41,14 +32,6 @@ def package_module_sources() -> dict[str, str]:
 
 
 def read_table_names(path: Path) -> list[str]:
-    """List the non-internal table names of a database.
-
-    Args:
-        path: Database file to inspect.
-
-    Returns:
-        The table names, sorted.
-    """
     with closing(sqlite3.connect(path)) as connection:
         rows = connection.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table'"
@@ -60,7 +43,6 @@ def read_table_names(path: Path) -> list[str]:
 def test_initialization_creates_the_designed_schema(
     tmp_path: Path,
 ) -> None:
-    """An absent file becomes a database holding the designed tables."""
     path = tmp_path / "disposable.sqlite3"
 
     schema.initialize_database(path)
@@ -71,7 +53,6 @@ def test_initialization_creates_the_designed_schema(
 def test_initialization_records_the_schema_version(
     tmp_path: Path,
 ) -> None:
-    """The installed schema version is recorded by the same call."""
     path = tmp_path / "disposable.sqlite3"
 
     schema.initialize_database(path)
@@ -86,7 +67,6 @@ def test_initialization_records_the_schema_version(
 def test_a_failed_initialization_leaves_no_database_behind(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A script failure yields no database, not a partial one."""
     path = tmp_path / "disposable.sqlite3"
     monkeypatch.setattr(
         schema,
@@ -103,7 +83,6 @@ def test_a_failed_initialization_leaves_no_database_behind(
 def test_an_existing_database_is_not_recreated_or_overwritten(
     tmp_path: Path,
 ) -> None:
-    """A second call fails by name and preserves the stored data."""
     path = tmp_path / "disposable.sqlite3"
     schema.initialize_database(path)
     with closing(sqlite3.connect(path)) as connection:
@@ -127,7 +106,6 @@ def test_an_existing_database_is_not_recreated_or_overwritten(
 
 
 def test_an_existing_file_is_not_overwritten(tmp_path: Path) -> None:
-    """Any existing file blocks initialization and stays untouched."""
     path = tmp_path / "disposable.sqlite3"
     path.write_text("not a database", encoding="utf-8")
 
@@ -142,7 +120,6 @@ def test_an_existing_file_is_not_overwritten(tmp_path: Path) -> None:
 def test_the_schema_is_read_independently_of_the_directory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Initialization works from an unrelated working directory."""
     working_directory = tmp_path / "elsewhere"
     working_directory.mkdir()
     monkeypatch.chdir(working_directory)
@@ -154,7 +131,6 @@ def test_the_schema_is_read_independently_of_the_directory(
 
 
 def test_no_other_module_invokes_the_initializer() -> None:
-    """Nothing else in the package creates a database on its own."""
     callers = sorted(
         name
         for name, source in package_module_sources().items()
@@ -165,7 +141,6 @@ def test_no_other_module_invokes_the_initializer() -> None:
 
 
 def test_the_initializer_imports_no_package_module() -> None:
-    """The initialization transaction uses standard sqlite3 directly."""
     tree = ast.parse(package_module_sources()["schema.py"])
     imported: set[str] = set()
     for node in ast.walk(tree):
