@@ -1,6 +1,7 @@
 """Operation services for the Task Analyzer server.
 
-Covers PCE-37 through PCE-43 (REQ-010, REQ-031).
+Covers PCE-29 through PCE-31, PCE-35 and PCE-37 through PCE-43
+(REQ-010, REQ-028, REQ-031).
 
 One submitted attempt resolves once. The runner here turns a request
 plus a command into exactly one terminal result, and it does so in the
@@ -26,6 +27,10 @@ without a result and the caller consults the original identity instead.
 
 The runner knows nothing about what a command does, so the commands of
 delivery 1B use it unchanged.
+
+Fixing the product time zone is deliberately outside that flow. It is a
+compare-and-set on a singleton, so the same key is safe to repeat
+without an operation identity and no retained zone is ever replaced.
 """
 
 from __future__ import annotations
@@ -34,9 +39,12 @@ import json
 import sqlite3
 from collections.abc import Callable
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from task_analyzer_server import storage
+from task_analyzer_server.clock import Clock, product_date
 from task_analyzer_server.contracts import (
+    ConfigurationView,
     ErrorCode,
     OperationRequest,
     OperationResult,
@@ -165,6 +173,111 @@ def lookup_operation(
     ) as connection:
         retained = storage.read_operation(connection, operation_id)
     return None if retained is None else retained.result
+
+
+def configure_zone(
+    settings: ServerSettings, clock: Clock, zone_key: str
+) -> ConfigurationView:
+    """Fix the product time zone, or confirm the one already fixed.
+
+    Setup is a compare-and-set on a singleton, not a task operation, so
+    it records no operation result and needs no operation identity. The
+    same key is therefore safe to send again: it returns the retained
+    configuration instead of a second outcome.
+
+    Validity is decided before any connection is opened, so a key the
+    zone database does not know stores nothing at all.
+
+    Args:
+        settings: Runtime configuration naming the database.
+        clock: The server's source of the current instant.
+        zone_key: The IANA key the desktop supplies during setup.
+
+    Returns:
+        The configuration as it stands once the attempt finished.
+
+    Raises:
+        ProtocolRefusalError: ``INVALID_TIME_ZONE`` if the key is not a
+            known IANA zone, or ``PRODUCT_TIME_ZONE_FIXED`` if another
+            key is already retained. The retained zone is never
+            replaced.
+    """
+    _confirm_known_zone(zone_key)
+    with storage.open_connection(
+        settings.database_path, settings.db_busy_timeout_ms
+    ) as connection:
+        with storage.write_transaction(connection):
+            stored = storage.store_product_time_zone(connection, zone_key)
+    if stored.outcome is storage.ZoneOutcome.CONFLICTING:
+        raise ProtocolRefusalError(ErrorCode.PRODUCT_TIME_ZONE_FIXED)
+    return configuration_view(clock, stored.product_time_zone)
+
+
+def configuration_view(
+    clock: Clock, zone_key: str | None
+) -> ConfigurationView:
+    """Describe the configuration at one sampled server instant.
+
+    The product date comes from server time read in the retained zone.
+    Neither the desktop's zone nor the server host's display zone takes
+    part, so a client that moves or changes its clock cannot change what
+    the product date is.
+
+    Args:
+        clock: The server's source of the current instant.
+        zone_key: The retained IANA key, or ``None`` while unset.
+
+    Returns:
+        The configuration view for that instant.
+    """
+    now = clock.now()
+    return ConfigurationView(
+        configured=zone_key is not None,
+        product_time_zone=zone_key,
+        server_now=now,
+        product_date=(
+            None if zone_key is None else product_date(now, ZoneInfo(zone_key))
+        ),
+    )
+
+
+def require_product_time_zone(connection: sqlite3.Connection) -> str:
+    """Refuse a task command while the product zone is unset.
+
+    The refusal happens before any task work, so an unconfigured server
+    records no terminal task result for the attempt: the desktop
+    completes setup and submits the action again.
+
+    Args:
+        connection: An open connection from the operation flow.
+
+    Returns:
+        The retained IANA key.
+
+    Raises:
+        ProtocolRefusalError: ``PRODUCT_TIME_ZONE_REQUIRED`` if no zone
+            has been fixed yet.
+    """
+    zone_key = storage.read_product_time_zone(connection)
+    if zone_key is None:
+        raise ProtocolRefusalError(ErrorCode.PRODUCT_TIME_ZONE_REQUIRED)
+    return zone_key
+
+
+def _confirm_known_zone(zone_key: str) -> None:
+    """Refuse a submitted key the server's zone data does not know.
+
+    Args:
+        zone_key: The submitted IANA key.
+
+    Raises:
+        ProtocolRefusalError: ``INVALID_TIME_ZONE`` if the key is
+            unknown or not a usable zone name.
+    """
+    try:
+        ZoneInfo(zone_key)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ProtocolRefusalError(ErrorCode.INVALID_TIME_ZONE) from None
 
 
 def _resolve(

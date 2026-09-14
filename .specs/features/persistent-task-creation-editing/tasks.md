@@ -644,7 +644,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T18: Implement fixed product zone configuration
+### T18: Implement fixed product zone configuration [Complete]
 
 **What**: Add `configure_zone` performing the atomic compare-and-set of the product time zone and returning the configuration view.
 **Where**: `src/task-analyzer-server/task_analyzer_server/services.py` (modify)
@@ -659,13 +659,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] An unknown or invalid IANA key is rejected without storing anything.
-- [ ] The first valid setup persists the zone; repeating the same key returns the same configuration; a different key is refused and the retained zone is unchanged.
-- [ ] Configuration setup needs no operation ledger entry, matching the approved compare-and-set contract.
-- [ ] The returned view reports the configured flag, retained zone, server UTC time, and the current product date derived from that zone.
-- [ ] Integration tests confirm the retained zone is unaffected by a different host or client zone.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 10 tests pass in `tests/server/integration/test_services_configuration.py` (no silent deletions).
+- [x] An unknown or invalid IANA key is rejected without storing anything.
+- [x] The first valid setup persists the zone; repeating the same key returns the same configuration; a different key is refused and the retained zone is unchanged.
+- [x] Configuration setup needs no operation ledger entry, matching the approved compare-and-set contract.
+- [x] The returned view reports the configured flag, retained zone, server UTC time, and the current product date derived from that zone.
+- [x] Integration tests confirm the retained zone is unaffected by a different host or client zone.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 10 tests pass in `tests/server/integration/test_services_configuration.py` (no silent deletions).
 
 **Tests**: integration
 **Gate**: full
