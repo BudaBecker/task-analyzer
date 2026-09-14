@@ -902,13 +902,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] A valid edit returns `200` with the durable result and the updated snapshot; identity and original creation time are unchanged in the response.
-- [ ] An absent target returns `404 TASK_NOT_FOUND` and a target outside the 1A pending-edit command returns `409 TASK_STATE_INCOMPATIBLE`, both as stored rejections.
-- [ ] The body replaces the whole editable form state: omitted optional values mean absent and `null` clears a value.
-- [ ] Replaying an older edit after a later accepted edit returns the original stored snapshot without overwriting current task state.
-- [ ] E2E tests cover acceptance, each rejection, clearing, stale replay, before-setup, malformed envelope, invalid field types, changed-content ID reuse and storage failure. Verify creation/edit parity for protocol errors and durable rejections within this task.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 16 tests pass in `tests/server/integration/test_api_tasks_edit.py` (no silent deletions).
+- [x] A valid edit returns `200` with the durable result and the updated snapshot; identity and original creation time are unchanged in the response.
+- [x] An absent target returns `404 TASK_NOT_FOUND` and a target outside the 1A pending-edit command returns `409 TASK_STATE_INCOMPATIBLE`, both as stored rejections.
+- [x] The body replaces the whole editable form state: omitted optional values mean absent and `null` clears a value.
+- [x] Replaying an older edit after a later accepted edit returns the original stored snapshot without overwriting current task state.
+- [x] E2E tests cover acceptance, each rejection, clearing, stale replay, before-setup, malformed envelope, invalid field types, changed-content ID reuse and storage failure. Verify creation/edit parity for protocol errors and durable rejections within this task.
+- [x] Gate check passes: `python -m pytest tests/server`.
+- [x] Test count: at least 16 tests pass in `tests/server/integration/test_api_tasks_edit.py` (no silent deletions).
 
 **Tests**: e2e
 **Gate**: full

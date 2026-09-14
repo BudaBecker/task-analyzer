@@ -187,6 +187,40 @@ async def create_task(request: Request) -> Response:
     )
 
 
+@router.put("/tasks/{task_id}")
+async def edit_task(request: Request, task_id: str) -> Response:
+    """Replace the editable state of one pending task.
+
+    The whole editable form arrives at once, so an omitted optional
+    value and an explicit ``null`` both mean the value is absent
+    afterwards. Identity, original creation time and status belong to
+    the server and no edit moves them.
+
+    Args:
+        request: The submitted HTTP request.
+        task_id: Identity of the task the request targets.
+
+    Returns:
+        The terminal result of the attempt, answered with the status
+        that attempt was originally settled with.
+
+    Raises:
+        ProtocolRefusalError: If the envelope is unusable, the identity
+            was already resolved for different content, or no product
+            time zone has been fixed.
+    """
+    timer = DurationTimer()
+    submitted = await _submitted_operation(request)
+    target = _usable_identity(task_id)
+    return _resolved(
+        request,
+        services.edit_task(
+            _settings_of(request), _clock_of(request), submitted, target
+        ),
+        timer,
+    )
+
+
 @router.get("/tasks")
 def read_tasks(request: Request) -> Response:
     """Publish every managed task with the context of one reading.
@@ -278,14 +312,35 @@ def usable_operation_id(request: Request, submitted: str) -> UUID:
         ProtocolRefusalError: ``INVALID_OPERATION_ENVELOPE`` if the text
             is not a usable UUID.
     """
+    identity = _usable_identity(submitted)
+    _request_state(request)[OPERATION_ID_KEY] = identity
+    return identity
+
+
+def _usable_identity(submitted: str) -> UUID:
+    """Read one submitted envelope identity.
+
+    Both the operation and the task target are named by identities the
+    server must be able to read before any work starts. Text that is not
+    one names nothing, so the request never reaches the operation flow
+    and nothing about it is retained.
+
+    Args:
+        submitted: The identity text as submitted.
+
+    Returns:
+        The submitted identity.
+
+    Raises:
+        ProtocolRefusalError: ``INVALID_OPERATION_ENVELOPE`` if the text
+            is not a usable UUID.
+    """
     try:
-        identity = UUID(submitted.strip())
+        return UUID(submitted.strip())
     except ValueError:
         raise services.ProtocolRefusalError(
             ErrorCode.INVALID_OPERATION_ENVELOPE
         ) from None
-    _request_state(request)[OPERATION_ID_KEY] = identity
-    return identity
 
 
 async def _submitted_operation(request: Request) -> OperationRequest:
