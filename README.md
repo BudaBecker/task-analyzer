@@ -16,13 +16,13 @@ Accounts, installation management, recovery, backup, synchronization, offline an
 
 The product definition is ready for feature specification work. The [MVP map](docs/product/mvp-map.md) prioritizes the server and identifies dependencies and opportunities for parallel work.
 
-The first server delivery has an [approved specification](.specs/features/persistent-task-creation-editing/spec.md), an [approved Design](.specs/features/persistent-task-creation-editing/design.md), and a [task plan](.specs/features/persistent-task-creation-editing/tasks.md) awaiting approval. Application code, executable tests, and build/deployment configuration have not been implemented. There is no runnable application or application setup procedure yet.
+The first server delivery has an [approved specification](.specs/features/persistent-task-creation-editing/spec.md), a [Design](.specs/features/persistent-task-creation-editing/design.md) with an approved baseline and audit revision awaiting review, and a revised [task plan](.specs/features/persistent-task-creation-editing/tasks.md) awaiting approval. The user approved the audit-time deadline clarifications recorded in [context](.specs/features/persistent-task-creation-editing/context.md). Application code, executable tests, and build/deployment configuration have not been implemented. There is no runnable application or application setup procedure yet.
 
 The [platform and access requirements](docs/product/requirements.md#platform-and-access) define the Windows target, server-side Python baseline, dedicated hosting, and private access. [AD-001](.specs/STATE.md#ad-001) records the approved FastAPI/SQLite architecture on Ubuntu Server 26.04.1 LTS and [AD-002](.specs/STATE.md#ad-002) the shared server contracts from the approved 1A Design. Remaining technical choices, including the Windows client, are tracked in [AGENTS.md](AGENTS.md#open-questions).
 
 Development uses TLC Spec Driven: **Specify → Design → Tasks → Execute**. [Product requirements](docs/product/requirements.md) remain the approved product inputs; approved feature specifications in `.specs/features/` are the source of truth for implementation. [AGENTS.md](AGENTS.md#source-of-truth-and-workflow) defines sizing, artifact creation, approvals, and verification. Small changes use an inline specification, Medium features use a brief specification, and Large/Complex features use formal design and tasks. Skipped phases do not waive authorization or tests.
 
-[Project state](.specs/STATE.md) records decisions and the current handoff, with links to the approved documentation. The lesson store has no confirmed lessons. Design and Tasks approvals remain necessary before implementation; no commits are authorized by the current work.
+[Project state](.specs/STATE.md) records decisions and the current handoff, with links to the approved documentation. The lesson store has no confirmed lessons. The revised Design and Tasks require approval before application implementation. The current audit-correction work authorizes documentation and local commits only; it does not authorize implementation, push, merge, deployment or real database changes.
 
 ## TLC skill setup
 
@@ -94,7 +94,9 @@ task-analyzer/
 |       |-- .gitkeep
 |       `-- persistent-task-creation-editing/
 |           |-- spec.md         # Approved delivery 1A behavior
-|           `-- design.md       # Detailed design awaiting approval
+|           |-- context.md      # Approved audit-time temporal clarifications
+|           |-- design.md       # Approved baseline; audit revision awaiting review
+|           `-- tasks.md        # Revised plan awaiting approval
 |-- .vscode/                    # Local editor settings; ignored by Git
 |-- docker/                     # Empty scaffold; no tooling decision implied
 |-- docs/

@@ -1,7 +1,7 @@
 # Persistent Task Creation and Editing Specification
 
 **Delivery:** 1A of the server lifecycle group.  
-**Phase:** Specify and Design approved; formal Tasks awaiting approval.
+**Phase:** Specify approved, including audit-time temporal clarifications; Design baseline approved with audit revision awaiting review; formal Tasks awaiting approval.
 
 **Status:** Behavioral specification approved by the user. The delivery boundary was confirmed on 2026-09-13.
 
@@ -58,9 +58,9 @@ Dependencies concern stable contracts; they do not require finishing implementat
 | New incompatible-state commands in 1B | Reject a new Complete on an already completed task or a new Reopen on an already pending task, preserving data and timestamps. | User selected rejection in Q2. This differs from recovering the result of the same original attempt. | Yes, 2026-09-13; allocated to 1B. |
 | Product semantics | Use the linked approved requirements and scenarios without changing their inputs, expected outcomes, or meaning. | Product discovery is complete; this specification allocates existing behavior. | Yes, approved product inputs. |
 | Technical choices | Reserve choices and detailed contracts for Design; retain the approved Python baseline and Tailscale. | Required by the repository's current phase and the confirmed interview boundary. | Yes, approved project constraints. |
-| Runtime baseline (PCE-44) | Require Python 3.13 or later instead of 3.11. | The user raised the minimum while approving the task plan; REQ-003 and PCE-44 were updated together and no other criterion changed. | Yes, 2026-09-13. |
+| Runtime baseline (PCE-44) | Require Python 3.13 or later instead of 3.11. | The user explicitly raised the minimum during task planning; REQ-003 and PCE-44 were updated together and no other criterion changed. | Yes, 2026-09-13. |
 | Character counting (TXT-01) | Count user-perceived characters for title and observation bounds, not Unicode code points. | User explicitly selected visual character counting when the wire contract was detailed. | Yes, clarified during Design on 2026-09-13. |
-| Exceptional midnight (TIME-01) | Use the first occurrence of a repeated cutoff midnight; if absent, use the first valid instant of the following date. | User explicitly approved this interpretation of REQ-011's calendar cutoff. | Yes, clarified during Design on 2026-09-13. |
+| Exceptional midnight (TIME-01) | Use the first occurrence of a repeated cutoff midnight; if absent, use the first valid instant of the following date, extended for a wholly skipped date by TIME-02 below. | User explicitly approved this interpretation of REQ-011's calendar cutoff. | Yes, clarified during Design on 2026-09-13. |
 | Skipped following date (TIME-02) | Use the first existing instant after the skipped date. | User approved the Pacific/Apia example during audit correction; see [context.md](context.md). | Yes, 2026-09-13. |
 | Deadline range (TIME-03) | Accept calendar deadlines from `0001-01-01` through `9999-12-30`, inclusive. | User approved excluding `9999-12-31` so next-day cutoffs remain representable; no other original scenario changes. | Yes, 2026-09-13. |
 
@@ -225,17 +225,17 @@ The following are verification obligations linked to existing criteria, not addi
 
 | Requirement ID | Acceptance criteria / story | Coverage in 1A and remaining allocation | Phase | Status |
 | --- | --- | --- | --- | --- |
-| REQ-003 | PCE-44, PCE-45 | Server runtime/self-hosting constraints. Technical design and implementation verification pending. | Specify | Pending |
-| REQ-007 | PCE-01 through PCE-10, PCE-11, PCE-14 through PCE-16, PCE-48, PCE-51, PCE-52 | Task fields, visual-character bounds, pending creation, and pending edits. Completed-task behavior belongs to 1B; input UI belongs to desktop. | Specify | Pending |
-| REQ-008 | PCE-01, PCE-11, PCE-12, PCE-14 through PCE-16, PCE-27, PCE-52 | Creation and pending edits only. Remaining lifecycle operations belong to 1B; end-to-end actions require desktop. | Specify | Pending |
-| REQ-010 | PCE-07, PCE-11, PCE-16, PCE-34, PCE-36, PCE-37, PCE-40 | Durability of this delivery's operations. Extend to 1B operations and verify desktop confirmation separately. | Specify | Pending |
-| REQ-011 | PCE-08, PCE-32, PCE-33, PCE-49, PCE-50 | Calendar-date cutoff, exceptional midnight, and pending overdue semantics. Completion-at-cutoff and presentation are verified in dependent features. | Specify | Pending |
-| REQ-028 | PCE-13, PCE-28 through PCE-31, PCE-35 | Original creation, server time, and retained fixed zone. Completion timestamps belong to 1B; initial-zone collection UI belongs to desktop. | Specify | Pending |
-| REQ-029 | PCE-12, PCE-17 through PCE-27, PCE-41, PCE-42 | Creation/edit comparison rules include completed/deleted candidates. Actual completion/reopening/deletion transition scenarios belong to 1B. | Specify | Pending |
-| REQ-031 | PCE-26, PCE-37 through PCE-43 | Server outcomes, lookup, and safe repetition for creation/edit. 1B extends operation coverage; desktop owns progress, 15 seconds, Retry sequencing, and presentation. | Specify | Pending |
-| REQ-027 | PCE-46, PCE-47 | Server personal/private-access constraints. Detailed setup belongs to Design and the desktop access scenario remains pending. | Specify | Pending |
+| REQ-003 | PCE-44, PCE-45 | Server runtime/self-hosting constraints. Design baseline approved; audit revision and implementation verification pending. | Tasks | In Tasks |
+| REQ-007 | PCE-01 through PCE-10, PCE-11, PCE-14 through PCE-16, PCE-48, PCE-51, PCE-52 | Task fields, visual-character bounds, pending creation, and pending edits. Completed-task behavior belongs to 1B; input UI belongs to desktop. | Tasks | In Tasks |
+| REQ-008 | PCE-01, PCE-11, PCE-12, PCE-14 through PCE-16, PCE-27, PCE-52 | Creation and pending edits only. Remaining lifecycle operations belong to 1B; end-to-end actions require desktop. | Tasks | In Tasks |
+| REQ-010 | PCE-07, PCE-11, PCE-16, PCE-34, PCE-36, PCE-37, PCE-40 | Durability of this delivery's operations. Extend to 1B operations and verify desktop confirmation separately. | Tasks | In Tasks |
+| REQ-011 | PCE-08, PCE-32, PCE-33, PCE-49, PCE-50 | Calendar-date cutoff, exceptional midnight, and pending overdue semantics. Completion-at-cutoff and presentation are verified in dependent features. | Tasks | In Tasks |
+| REQ-028 | PCE-13, PCE-28 through PCE-31, PCE-35 | Original creation, server time, and retained fixed zone. Completion timestamps belong to 1B; initial-zone collection UI belongs to desktop. | Tasks | In Tasks |
+| REQ-029 | PCE-12, PCE-17 through PCE-27, PCE-41, PCE-42 | Creation/edit comparison rules include completed/deleted candidates. Actual completion/reopening/deletion transition scenarios belong to 1B. | Tasks | In Tasks |
+| REQ-031 | PCE-26, PCE-37 through PCE-43 | Server outcomes, lookup, and safe repetition for creation/edit. 1B extends operation coverage; desktop owns progress, 15 seconds, Retry sequencing, and presentation. | Tasks | In Tasks |
+| REQ-027 | PCE-46, PCE-47 | Server personal/private-access constraints. Design defines detailed setup; actual private-access evidence and the desktop scenario remain pending. | Tasks | In Tasks |
 
-**Coverage:** 9 active product IDs mapped to 52 acceptance criteria. All existing IDs and protected scenario inputs/outcomes are retained. PCE-08/09 and PCE-50 now reflect the audit clarifications explicitly approved by the user; PCE-51/52 add deadline-range criteria. PCE-48/49 preserve the earlier visual-counting and repeated-midnight clarifications. No requirement is marked Verified. No implementation tasks or executable tests have been created. Every acceptance criterion must acquire requirement-derived tests and evidence during the authorized Tasks/Execute work; the Independent Test descriptions above are planned scenarios, not test results.
+**Coverage:** 9 active product IDs mapped to 52 acceptance criteria. All existing IDs and protected scenario inputs/outcomes are retained. PCE-08/09 and PCE-50 now reflect the audit clarifications explicitly approved by the user; PCE-51/52 add deadline-range criteria. PCE-48/49 preserve the earlier visual-counting and repeated-midnight clarifications. No requirement is marked Verified. A formal [task plan](tasks.md) exists and awaits approval; no application code or executable tests have been created. Every acceptance criterion must acquire requirement-derived tests and evidence during the authorized Tasks/Execute work; the Independent Test descriptions above are planned scenarios, not test results.
 
 The remaining active MVP requirements are allocated outside 1A: REQ-009 to 1B; REQ-021 through REQ-025 and REQ-033 to analysis/dashboard; REQ-026 to deadline emphasis/presentation; REQ-001, REQ-030, REQ-032, and REQ-035 to desktop work, with deletion's server effects in 1B; and REQ-034 to derived-result and desktop refresh work. Cross-feature scenarios must retain their original product IDs and expectations.
 
@@ -252,13 +252,8 @@ These are future completion conditions. The behavioral specification is approved
 
 ## Open questions
 
-No unresolved behavioral decisions remain for 1A. The following technical choices remain for Design under [AGENTS.md](../../../AGENTS.md#open-questions); none is selected by this specification:
+No unresolved behavioral decision remains for 1A after the user-approved [temporal clarifications](context.md). The [Design](design.md) records the approved stack and baseline contracts plus the audit revision awaiting review; technical questions already resolved there are not reopened here.
 
-- Which backend framework, server storage technology, and supporting libraries implement the approved Python baseline and durability requirements?
-- Which communication contract carries configuration, task operations, task reads, and result lookup: request/response, persistent communication, or a combination?
-- How are task identity, repeated-attempt recognition, concurrent uniqueness enforcement, persistence confirmation, and result retention represented consistently? The approach must preserve original outcomes and prevent duplicate application, including across relevant restart/failure scenarios.
-- Which time representations, zone conversion approach, and initial-configuration contract implement the fixed product zone and calendar-date cutoff?
-- Which deployment tooling and detailed Tailscale setup support the approved private-access boundary?
-- Which implementation layout, isolated test setup, test framework, formatter, linter, type checker, build/CI checks, and structured logging schema should be proposed for approval?
-
-Windows client technology remains open for the relevant desktop Design. No deadline-emphasis, metrics, or desktop implementation is required to approve this specification.
+- Review the audit amendments to dependencies, protocol serialization, runtime startup, package verification and bootstrap gates, then approve the revised [tasks](tasks.md) before implementation.
+- Confirm the actual target interpreter, paths and private-access values in an explicitly authorized deployment session. Local task completion cannot satisfy that external verification checkpoint.
+- Windows client technology and remaining 1B/analysis/desktop decisions belong to their respective designs.

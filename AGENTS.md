@@ -2,7 +2,7 @@
 
 ## Project phase and language
 
-- The product definition in `docs/product/` is consolidated. Delivery 1A has an approved behavioral specification and is in Design. Do not restart product definition or write application code before the required Design and Tasks approvals.
+- The product definition in `docs/product/` is consolidated. Delivery 1A has an approved behavioral specification, including the audit-time temporal clarifications. Its Design baseline is approved; the audit revision and formal task plan await review/approval. Do not restart product definition or write application code before the required Design and Tasks approvals.
 - All repository artifacts must be in English: code, comments, documentation, and folder and file names. A request written in another language does not change this rule.
 - Python 3.13+, FastAPI, SQLite on the dedicated Ubuntu Server 26.04.1 LTS host, and private Tailscale access are approved; see [AD-001](.specs/STATE.md#ad-001) and the raised runtime baseline in [AD-003](.specs/STATE.md#ad-003). Other technical choices require approval in the relevant Design. Record unresolved choices as options under "Open questions" rather than treating draft proposals as approved.
 - Treat every item under "Backlog" as future work outside the MVP, never as an MVP requirement. Moving an item into scope requires explicit approval.
@@ -74,7 +74,7 @@ For server-side Python:
 - Use type annotations for all functions and methods, including parameters and return values.
 - Follow PEP 8 and clean-code principles.
 - Document modules, classes, functions, and methods using Google-style docstrings, including parameter documentation where applicable.
-- Produce structured logs through the standard `logging` module. The specific log schema remains open.
+- Produce structured logs through the standard `logging` module. The baseline JSON log schema is defined in the 1A Design; its audit revision clarifies request correlation. Follow the approved revision at implementation time.
 
 Client language conventions and formatting tools must be defined after the client technology is selected.
 
@@ -119,10 +119,8 @@ Formal `tasks.md` must include the Test Coverage Matrix, Gate Check Commands, an
 This section owns future technical decisions for the MVP. [Requirements](docs/product/requirements.md) defines product behavior, including the Windows validation range. Questions about future capabilities and their technologies belong to the [Backlog](docs/product/backlog.md#open-questions). Resolve the relevant questions in each feature's design; no option below selects a technology.
 
 - Which Windows client technology and remaining supporting libraries should be proposed for approval under the [platform and access constraints](docs/product/requirements.md#platform-and-access)? FastAPI, SQLite, and the Ubuntu server target are approved in [AD-001](.specs/STATE.md#ad-001); detailed proposals are in the [1A Design](.specs/features/persistent-task-creation-editing/design.md).
-- Which communication contract should carry task operations and results: request/response communication, persistent communication, or a combination? How will it provide the required refresh behavior?
-- How should the server recognize repeated operation attempts, expose their results, and enforce task uniqueness consistently? Define the technical contract and persistence approach without changing the required rejection and retry behavior.
-- Which time representations and conversion approach should implement server timestamps and the fixed product time zone?
-- Which deployment tooling and detailed Tailscale configuration should provide private access and desktop connection setup?
-- Which test framework, formatter, linter, type checker, build commands, and CI checks should the project configure?
-- What structured logging schema and fields should the server use?
-- What concrete implementation folder and file architecture should future feature specifications define within the existing layout?
+- Review the 1A Design audit amendments and its revised task gates before implementation. The baseline HTTP JSON contract, result ledger, SQLite policy, UTC/IANA time representation, logging fields and quality tools are already recorded in [AD-002](.specs/STATE.md#ad-002); do not reopen those choices as product discovery.
+- Which actual Ubuntu interpreter, installation paths, tailnet hostname and authorized device identifiers will the deployment use? Validate the target-specific lock and gates on that interpreter before claiming deployability; local locks do not establish target compatibility.
+- Which remaining Windows connection/setup, refresh scheduling and Windows-to-IANA mapping details should the desktop Design define?
+- Which CI provider and integration, if any, should be authorized separately? Local quality commands are already defined in the server Design.
+- Which additional contracts and implementation files are needed by 1B, analysis and the desktop within their own approved specifications?

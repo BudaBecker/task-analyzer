@@ -11,8 +11,8 @@ Implement these tasks with the `tlc-spec-driven` skill: **activate it by name an
 ---
 
 **Spec**: [spec.md](spec.md)
-**Design**: [design.md](design.md) (approved 2026-09-13)
-**Status**: Draft - awaiting task approval
+**Design**: [design.md](design.md) (approved baseline; audit revision awaiting review)
+**Status**: Draft - audit corrections applied; revised Design review and task approval required
 
 ---
 
@@ -28,19 +28,21 @@ Implement these tasks with the `tlc-spec-driven` skill: **activate it by name an
 | Persistence - `schema/*.sql`, `schema.py`, `storage.py` | integration | Key read/write paths plus constraint, index, transaction, and lock error paths, always against a newly allocated disposable database file | `tests/server/integration/test_*.py` | `python -m pytest tests/server/integration` |
 | Operation services - `services.py` | integration | All branches; 1:1 with the PCE criteria listed on the task; replay, conflict, rejection, restart, and rollback paths | `tests/server/integration/test_*.py` | `python -m pytest tests/server/integration` |
 | API - `api.py`, `app.py` | e2e | Every route the task adds: happy path, every listed edge case, and error/protocol paths, exercised through the composed application | `tests/server/integration/test_api_*.py` | `python -m pytest tests/server/integration` |
-| Packaging and deployment assets - `pyproject.toml`, `requirements/`, `*.service`, deployment guide | none | build gate only | - | build gate only |
+| Packaging and deployment assets - `pyproject.toml`, `requirements/`, `*.service`, deployment guide | none | Task-specific bootstrap checks for T1/T2; full Build for deployment assets | - | applicable bootstrap or Build command below |
 
 E2E tests live under `tests/server/integration/` because the approved design defines exactly two test locations; the `test_api_*` prefix keeps the route-level suites identifiable. Every test module records the REQ and PCE IDs it covers. Tests assert spec-defined outcomes, never internal calls. Every database used by a test is a newly allocated temporary file; no test may fall back to `TASK_ANALYZER_DATABASE_PATH` or any non-disposable database.
 
 ## Gate Check Commands
 
-> Generated from the approved design's quality gates - confirm before Execute. The commands become executable once T1 and T2 install the configured environment; T2 is the first task that runs the full Build gate.
+> Generated from the approved design's quality gates - confirm before Execute. T1/T2 use bounded bootstrap gates. The complete Build starts at the end of Phase 1 after T3/T4 introduce substantive modules and tests. Every required command must exit zero; missing targets and empty test collection are never passing evidence.
 
 | Gate Level | When to Use | Command |
 | --- | --- | --- |
+| Bootstrap configuration | T1 only | `python -c "import pathlib,tomllib; p=tomllib.loads(pathlib.Path('pyproject.toml').read_text()); assert p['project']['requires-python'] == '>=3.13'; assert p['build-system']['build-backend'] == 'setuptools.build_meta'; assert p['tool']['setuptools']['package-data']['task_analyzer_server'] == ['schema/*.sql']; assert p['tool']['pytest']['ini_options']['testpaths'] == ['tests/server']"`, plus review of the remaining named tool settings in T1 |
+| Bootstrap dependencies | T2 only | `python -m pip install --require-hashes -r requirements/dev-py313.txt` in a fresh Python 3.13 environment, then `python -m pip check`, `python -m pytest --version`, `python -m ruff --version`, `python -m mypy --version`, `python -m build --version`, and `python -m piptools compile --help` |
 | Quick | After tasks with unit tests only | `python -m pytest tests/server/unit` |
 | Full | After tasks with integration or e2e tests | `python -m pytest tests/server` |
-| Build | After phase completion or config/asset-only tasks | `python -m ruff format --check src/task-analyzer-server tests/server`, then `python -m ruff check src/task-analyzer-server tests/server`, then `python -m mypy --strict src/task-analyzer-server/task_analyzer_server`, then `python -m pytest tests/server`, then `python -m pip check`, then `python -m build` with an install-and-import check of the built wheel in an isolated environment |
+| Build | After phase completion or config/asset-only tasks | `python -m ruff format --check src/task-analyzer-server tests/server`, then `python -m ruff check src/task-analyzer-server tests/server`, then `python -m mypy --strict src/task-analyzer-server/task_analyzer_server`, then `python -m pytest tests/server`, then `python -m pip check`, then `python -m build --no-isolation` with an install-and-import check of the built wheel in an isolated environment; from T27 onward, the test gate also includes installed-wheel initialization/startup |
 
 Commands are listed separately rather than chained so they run unchanged in PowerShell and POSIX shells. Run them from the repository root in the locked development environment created by T2.
 
@@ -67,21 +69,21 @@ The versioned DDL and its explicit initialization entry point.
 T5 → T6
 ```
 
-### Phase 3: Domain and time rules
+### Phase 3: Input contracts, domain and time rules
 
-Pure rules with no storage or transport dependency.
+Input/issue types precede the validator; contracts never import domain validation.
 
 ```
-T7 → T8
+T11 → T7 → T8
 T9 → T10
 ```
 
-### Phase 4: Wire contracts
+### Phase 4: Response contracts
 
-Strict request and response models.
+Response serialization builds on Phase 3's input and issue value types.
 
 ```
-T11 → T12
+T12
 ```
 
 ### Phase 5: Storage access
@@ -106,7 +108,7 @@ T18 has no intra-phase dependency.
 
 ### Phase 7: API composition and routes
 
-Application composition followed by one route group per task.
+A self-testable HTTP foundation includes composition, error handlers and operation lookup. Subsequent routes reuse it; installed-package verification closes the phase.
 
 ```
 T22 → T23
@@ -151,15 +153,15 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] `requires-python = ">=3.13"` and package discovery resolves `src/task-analyzer-server/task_analyzer_server`.
+- [ ] `requires-python = ">=3.13"` and package discovery targets `src/task-analyzer-server/task_analyzer_server`; `task_analyzer_server` package data includes `schema/*.sql`. The metadata does not claim source already exists.
 - [ ] Direct runtime dependencies are declared: FastAPI, Uvicorn, Pydantic v2, `regex`, and `tzdata`; no exact versions are invented here - T2 resolves and pins them.
 - [ ] Ruff (line length 79, Google docstrings, import ordering, error and unused-code rules), mypy strict for the server package, and pytest `testpaths = ["tests/server"]` are configured; `.ai/` skill bundles are excluded from lint and type targets.
 - [ ] No client or desktop tooling is configured.
-- [ ] `python -m pip install -e .` succeeds in a disposable virtual environment on Python 3.13.
-- [ ] Gate check: the Build gate's tool commands are configured but not yet installable, so T2 runs them for the first time. Record that explicitly instead of claiming an unperformed run.
+- [ ] The bootstrap-configuration command passes and the review checks each named tool setting; no application import or test is claimed before substantive source exists.
+- [ ] Gate check passes: Bootstrap configuration. Editable installation and full Build are verified after T3/T4 before Phase 1 completes.
 
 **Tests**: none
-**Gate**: build
+**Gate**: bootstrap configuration
 
 **Commit**: `chore(server): configure package and tool baseline`
 
@@ -180,15 +182,15 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] `requirements/server.in` lists the runtime inputs and `requirements/dev.in` lists pytest, HTTPX, Ruff, mypy, build, and pip-tools.
-- [ ] Generated lock files pin exact released versions with hashes for Python 3.13; FastAPI, Starlette, and Pydantic are resolved together and never upgraded independently.
+- [ ] `requirements/server.in` lists the runtime inputs and `requirements/dev.in` includes `-r server.in` and lists pytest, HTTPX, Ruff, mypy, setuptools, build, and pip-tools. Runtime inputs match the direct dependencies in pyproject.toml. The requirements README ends with Open questions and records any target environment still awaiting verification.
+- [ ] `requirements/server-py313.txt` and `requirements/dev-py313.txt` pin released versions with hashes for the local Python 3.13 environment. Record its OS, architecture and interpreter in `requirements/README.md`; these locks do not claim cross-platform validation.  FastAPI, Starlette, and Pydantic are resolved together and never upgraded independently.
 - [ ] A dependency incompatible with the Python 3.13 baseline is reported as a design-revision proposal instead of raising the minimum.
 - [ ] The design requires the lock to be compatible with the interpreter the Ubuntu target provides. That host is not accessible from this environment, so T2 locks against the declared 3.13 baseline and records the target-interpreter confirmation as an explicit pending item in the deployment guide (T31). It is never reported as performed.
 - [ ] `python -m pip check` reports no broken requirements in the locked environment.
-- [ ] Gate check passes: `python -m ruff format --check src/task-analyzer-server tests/server`, `python -m ruff check src/task-analyzer-server tests/server`, and `python -m mypy --strict src/task-analyzer-server/task_analyzer_server` execute cleanly on the current empty targets; `python -m pytest tests/server` reports no tests collected, the expected state before T3.
+- [ ] Gate check passes: Bootstrap dependencies, including hash-verified installation and invocation of all approved tools. Full Build is required after T3/T4 at Phase 1 completion; no empty-test or missing-source failure is waived.
 
 **Tests**: none
-**Gate**: build
+**Gate**: bootstrap dependencies
 
 **Commit**: `chore(server): lock runtime and development dependencies`
 
@@ -212,7 +214,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 - [ ] `TASK_ANALYZER_DATABASE_PATH` is required and must be absolute; a missing or relative value raises a specific error naming the variable.
 - [ ] `TASK_ANALYZER_LOG_LEVEL` defaults to `INFO` and `TASK_ANALYZER_DB_BUSY_TIMEOUT_MS` defaults to `5000`; invalid values are rejected rather than silently coerced.
 - [ ] No default points at a development or production database; every test supplies its own disposable path.
-- [ ] Google-style docstrings and complete type annotations are present.
+- [ ] Google-style docstrings and complete type annotations are present. With this first substantive module, `python -m pip install --no-deps -e .` and importing `task_analyzer_server.settings` succeed in the locked environment; no empty package stub is needed.
 - [ ] Gate check passes: `python -m pytest tests/server/unit`.
 - [ ] Test count: at least 8 tests pass in `tests/server/unit/test_settings.py` (no silent deletions).
 
@@ -286,7 +288,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 **What**: Add `initialize_database(path)` as the only entry point that creates a new database from the versioned DDL.
 **Where**: `src/task-analyzer-server/task_analyzer_server/schema.py`
 **Depends on**: T5
-**Reuses**: T5's DDL asset; the design's startup policy that the application never initializes, migrates, or recreates a database.
+**Reuses**: T5's packaged DDL and standard sqlite3 directly, without importing storage.py; the design's startup policy that the application never initializes, migrates, or recreates a database.
 **Requirement**: PCE-34, PCE-35, PCE-45; REQ-003, REQ-010, REQ-028.
 
 **Tools**:
@@ -298,7 +300,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 - [ ] Initialization creates the schema and records the schema version in one transaction against an absent file.
 - [ ] An existing database is never silently recreated, migrated, or overwritten; the function raises a specific error identifying the path.
-- [ ] The initializer is importable but is never invoked at application startup.
+- [ ] The initializer is importable but never invoked at application startup. Load `schema/001_initial.sql` through standard `importlib.resources`, independent of the checkout/current directory. Its initialization transaction uses standard sqlite3 directly; T13 operational helpers are not dependencies.
 - [ ] Integration tests run only against newly allocated temporary paths; no test targets a configured runtime database.
 - [ ] Gate check passes: `python -m pytest tests/server`.
 - [ ] Test count: at least 6 tests pass in `tests/server/integration/test_schema_init.py` (no silent deletions).
@@ -310,12 +312,42 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
+### T11: Implement strict request contracts
+
+**What**: Add the task input and operation envelope request models with strict parsing and stable field-error codes.
+**Where**: `src/task-analyzer-server/task_analyzer_server/contracts.py`
+**Depends on**: T2
+**Reuses**: The design's input rules and stable codes; Pydantic v2 strict mode. Define ValidationIssue alongside TaskInput; contracts must not import domain.py or services.py.
+**Requirement**: PCE-01, PCE-10, PCE-11, PCE-16, PCE-48; REQ-007, REQ-008.
+
+**Tools**:
+
+- MCP: NONE
+- Skill: NONE
+
+**Done when**:
+
+- [ ] `TaskInput` accepts `title` string, `observations` string or null, and `deadline` calendar-date string or null; `null` clears an optional value and an omitted optional value means absent.
+- [ ] Type coercion is rejected as `INVALID_FIELD_TYPE`, unknown fields as `UNEXPECTED_FIELD`, and server-owned fields such as status or creation time are rejected rather than silently applied.
+- [ ] `ValidationIssue` is an immutable field/code value type. Strict structural parsing is separate from T7 business validation; neither bypasses the durable rejection flow for valid operation envelopes.
+- [ ] `OperationRequest` binds the operation UUID, method, canonical task target, and parsed JSON payload.
+- [ ] Framework validation errors are translated into the stable codes; framework error objects and echoed input never reach the contract surface.
+- [ ] Gate check passes: `python -m pytest tests/server/unit`.
+- [ ] Test count: at least 16 tests pass in `tests/server/unit/test_contracts_input.py` (no silent deletions).
+
+**Tests**: unit
+**Gate**: quick
+
+**Commit**: `feat(server): add strict request contracts`
+
+---
+
 ### T7: Implement task field validation
 
 **What**: Add `validate_task` enforcing the approved title, observations, and deadline rules with user-perceived character counting.
 **Where**: `src/task-analyzer-server/task_analyzer_server/domain.py`
-**Depends on**: T2
-**Reuses**: The design's text-bounds rules and stable field-error codes.
+**Depends on**: T11
+**Reuses**: T11's TaskInput and ValidationIssue types; the design's text-bounds rules and stable field-error codes.
 **Requirement**: PCE-01 through PCE-10, PCE-15, PCE-16, PCE-48, PCE-51, PCE-52; REQ-007, REQ-008, REQ-011.
 
 **Tools**:
@@ -404,7 +436,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 **Where**: `src/task-analyzer-server/task_analyzer_server/clock.py` (modify)
 **Depends on**: T9
 **Reuses**: T9's conversion helpers; the design's fold and gap resolution procedure.
-**Requirement**: PCE-32, PCE-33, PCE-49, PCE-50, PCE-51, PCE-52; REQ-011.
+**Requirement**: PCE-32, PCE-33, PCE-49, PCE-50; REQ-011.
 
 **Tools**:
 
@@ -428,35 +460,6 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T11: Implement strict request contracts
-
-**What**: Add the task input and operation envelope request models with strict parsing and stable field-error codes.
-**Where**: `src/task-analyzer-server/task_analyzer_server/contracts.py`
-**Depends on**: T7
-**Reuses**: T7's validation issues and codes; the design's input rules; Pydantic v2 strict mode.
-**Requirement**: PCE-01, PCE-10, PCE-11, PCE-16, PCE-48; REQ-007, REQ-008.
-
-**Tools**:
-
-- MCP: NONE
-- Skill: NONE
-
-**Done when**:
-
-- [ ] `TaskInput` accepts `title` string, `observations` string or null, and `deadline` calendar-date string or null; `null` clears an optional value and an omitted optional value means absent.
-- [ ] Type coercion is rejected as `INVALID_FIELD_TYPE`, unknown fields as `UNEXPECTED_FIELD`, and server-owned fields such as status or creation time are rejected rather than silently applied.
-- [ ] `OperationRequest` binds the operation UUID, method, canonical task target, and parsed JSON payload.
-- [ ] Framework validation errors are translated into the stable codes; framework error objects and echoed input never reach the contract surface.
-- [ ] Gate check passes: `python -m pytest tests/server/unit`.
-- [ ] Test count: at least 16 tests pass in `tests/server/unit/test_contracts_input.py` (no silent deletions).
-
-**Tests**: unit
-**Gate**: quick
-
-**Commit**: `feat(server): add strict request contracts`
-
----
-
 ### T12: Implement response and result contracts
 
 **What**: Add the snapshot, configuration, list, operation-result, operation-error, and protocol-error response models with their exact serialization.
@@ -475,7 +478,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 - [ ] `TaskSnapshot` exposes exactly `task_id`, `title`, `observations`, `deadline`, `status`, `created_at`, and `completed_at`; internal comparison and deletion fields are never exposed.
 - [ ] `ConfigurationView` and the task-list response carry the configured flag or zone, `server_now`, and `product_date`, with an empty `items` array for an empty collection.
 - [ ] `OperationResult` carries `operation_id`, `outcome`, `original_http_status`, nullable `task`, nullable `error`, and `resolved_at`, with exactly one of `task` and `error` non-null, asserted in both directions.
-- [ ] `OperationError` carries a stable `code`, a `fields` array of field and code pairs that is empty for a non-field error, and a nullable `conflicting_task_id`; `ProtocolError` carries no terminal `outcome`.
+- [ ] `OperationError` carries a stable `code`, a `fields` array of field and code pairs that is empty for a non-field error, and a nullable `conflicting_task_id`; `ProtocolError` contains exactly `request_id`, `error` (code and fields), and `operation_id` only for a usable supplied ID, with no terminal `outcome`.
 - [ ] UTC instants serialize with an explicit `Z` suffix and six fractional digits; deadlines serialize as `YYYY-MM-DD`; UUIDs serialize as canonical lowercase hyphenated text.
 - [ ] A test asserts that the design's example persisted creation result serializes field for field.
 - [ ] Gate check passes: `python -m pytest tests/server/unit`.
@@ -629,6 +632,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 - [ ] A reused operation identity with a different canonical request returns a protocol conflict and preserves the original ledger entry and all task data.
 - [ ] A terminal result is stored in the same transaction as its mutation, the transaction commits before any terminal response is produced, and an unexpected storage error ends the transaction without producing a terminal outcome.
 - [ ] The runner is reusable by delivery 1B commands without modification.
+- [ ] `lookup_operation(operation_id)` reads the committed ledger without a write transaction, returning its retained result or unknown; integration tests cover both outcomes.
 - [ ] Integration tests cover replay of a success, replay of a rejection, identity reuse with different content, and a commit failure that is not reported as persisted.
 - [ ] Gate check passes: `python -m pytest tests/server`.
 - [ ] Test count: at least 16 tests pass in `tests/server/integration/test_services_runner.py` (no silent deletions).
@@ -761,13 +765,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T22: Compose the application and startup checks
+### T22: Compose the HTTP application with operation lookup and error handling
 
-**What**: Add `create_app` composing settings, logging, clock, services, and the router, with the approved startup verification.
-**Where**: `src/task-analyzer-server/task_analyzer_server/app.py`
-**Depends on**: T3, T4, T13, T14
-**Reuses**: T3's settings, T4's logging, T13's connection policy, and T14's configuration read.
-**Requirement**: PCE-34, PCE-35, PCE-44, PCE-45, PCE-46; REQ-003, REQ-010, REQ-027, REQ-028.
+**What**: Deliver one self-testable HTTP boundary: composition, startup verification, runtime factory, protocol handlers and the first concrete operation-lookup route.
+**Where**: `src/task-analyzer-server/task_analyzer_server/` (the HTTP boundary in `app.py` and `api.py`)
+**Depends on**: T3, T4, T13, T14, T17, T12
+**Reuses**: Settings, logging, connection policy, configuration read, committed-result lookup and response contracts.
+**Requirement**: PCE-26, PCE-34, PCE-35, PCE-38, PCE-40 through PCE-47; REQ-003, REQ-010, REQ-027, REQ-028, REQ-029, REQ-031.
 
 **Tools**:
 
@@ -776,19 +780,22 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] Startup opens the configured database in existing-file mode and verifies the schema version, effective connection settings, and readable configuration.
-- [ ] An absent or incompatible database fails visibly at startup; the application never initializes, migrates, or recreates a database.
-- [ ] A newly initialized database with an unset product zone starts successfully and keeps the configuration endpoints usable.
-- [ ] Runtime and time-data versions are logged at startup, and the clock is injectable for tests.
-- [ ] No product sign-in, product account, or forwarded-identity handling is introduced.
-- [ ] Tests exercise the composed application through HTTPX against disposable databases, covering successful startup, missing database, and incompatible schema version.
+- [ ] `create_app(settings, clock)` composes real services, the operation-lookup router and handlers. `api.py` never imports `app.py`; future routes register in that same router without a deferred composition fix.
+- [ ] `application_factory() -> FastAPI` constructs settings from the approved environment and the default clock, then calls `create_app`. The Uvicorn entry is `task_analyzer_server.app:application_factory --factory`; it accepts no arguments and never initializes a database.
+- [ ] Startup opens the configured database in existing-file mode and verifies schema version, PRAGMAs and readable configuration. Missing/incompatible databases fail visibly; an initialized database with no zone starts successfully.
+- [ ] Runtime and time-data versions are logged. No product sign-in, accounts or forwarded-identity handling is introduced.
+- [ ] `GET /v1/operations/{operation_id}` returns 200 for either stored terminal outcome, preserving original status inside the result, or `404 OPERATION_RESULT_UNKNOWN` for no committed result. Unknown never implies rejection or rollback.
+- [ ] Shared handlers map `400 INVALID_OPERATION_ENVELOPE`, `409 OPERATION_ID_REUSED`, `409 PRODUCT_TIME_ZONE_REQUIRED`, `503 STORAGE_UNAVAILABLE` and `500 INTERNAL_ERROR` to the exact ProtocolError contract. Nonempty request IDs correlate response errors and logs; errors never expose input or invent terminal outcomes.
+- [ ] Envelope parsing and task validation remain distinct: malformed JSON/unusable operation IDs are protocol errors; invalid task fields with a valid envelope enter the durable validation flow. Replays resolve before new-attempt validation.
+- [ ] HTTPX tests run the composed application's lifespan with disposable databases. Cover startup success/failures, the default factory, stored success/rejection lookup, unknown lookup, invalid lookup ID and infrastructure errors. Handler-only cases use test-local routes registered on this composed application, never production placeholders.
+- [ ] Responses carry `Cache-Control: no-store`. Assert exact error field sets, including omission of unusable operation IDs and matching request IDs in logs.
 - [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 10 tests pass in `tests/server/integration/test_api_app.py` (no silent deletions).
+- [ ] Test count: at least 26 tests pass across `tests/server/integration/test_api_app.py` and `tests/server/integration/test_api_operations.py` (no silent deletions).
 
 **Tests**: e2e
 **Gate**: full
 
-**Commit**: `feat(server): compose application and startup checks`
+**Commit**: `feat(server): compose http application and outcome lookup`
 
 ---
 
@@ -869,7 +876,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 - [ ] Validation rejections return `422 TASK_VALIDATION_FAILED` and uniqueness rejections `409 TASK_UNIQUENESS_CONFLICT`, both stored as terminal results.
 - [ ] A task command before zone setup returns `409 PRODUCT_TIME_ZONE_REQUIRED` without recording a terminal task result.
 - [ ] A repeated identical attempt returns the original stored result with its original HTTP status and creates no second task.
-- [ ] E2E tests cover the approved boundary fixtures, a lost-response replay, and the before-setup case.
+- [ ] E2E tests cover boundary fixtures, lost-response replay, before-setup, malformed JSON, unusable ID, changed-content ID reuse, wrong field types, unknown fields and storage failure. Exact responses and lookup must distinguish retained rejections from protocol-only failures using T22 handlers.
 - [ ] Gate check passes: `python -m pytest tests/server`.
 - [ ] Test count: at least 18 tests pass in `tests/server/integration/test_api_tasks_create.py` (no silent deletions).
 
@@ -899,7 +906,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 - [ ] An absent target returns `404 TASK_NOT_FOUND` and a target outside the 1A pending-edit command returns `409 TASK_STATE_INCOMPATIBLE`, both as stored rejections.
 - [ ] The body replaces the whole editable form state: omitted optional values mean absent and `null` clears a value.
 - [ ] Replaying an older edit after a later accepted edit returns the original stored snapshot without overwriting current task state.
-- [ ] E2E tests cover acceptance, each rejection, optional clearing, and the stale-replay case.
+- [ ] E2E tests cover acceptance, each rejection, clearing, stale replay, before-setup, malformed envelope, invalid field types, changed-content ID reuse and storage failure. Verify creation/edit parity for protocol errors and durable rejections within this task.
 - [ ] Gate check passes: `python -m pytest tests/server`.
 - [ ] Test count: at least 16 tests pass in `tests/server/integration/test_api_tasks_edit.py` (no silent deletions).
 
@@ -910,13 +917,13 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ---
 
-### T27: Add operation lookup and protocol error handling
+### T27: Verify initialization and startup from the installed wheel
 
-**What**: Add `GET /v1/operations/{operation_id}` and the application-wide protocol and infrastructure error handlers.
-**Where**: `src/task-analyzer-server/task_analyzer_server/api.py` (modify)
-**Depends on**: T26
-**Reuses**: The ledger read through the services layer and T12's protocol error contract.
-**Requirement**: PCE-26, PCE-38, PCE-40 through PCE-43; REQ-029, REQ-031.
+**What**: Prove the installed distribution can initialize a disposable database and run the documented Uvicorn factory outside the checkout.
+**Where**: `tests/server/integration/test_installed_distribution.py`
+**Depends on**: T26, T6
+**Reuses**: T1 package data, T6 initializer, T22 runtime factory; standard subprocess/venv and approved build tooling.
+**Requirement**: PCE-34, PCE-35, PCE-44, PCE-45; REQ-003, REQ-010, REQ-028.
 
 **Tools**:
 
@@ -925,18 +932,18 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] Lookup returns HTTP 200 for either stored terminal outcome, carrying the original HTTP status inside the result, and `404 OPERATION_RESULT_UNKNOWN` when no committed result can be established.
-- [ ] Unknown is never presented as rejection, cancellation, or rollback, and lookup's HTTP 200 never implies successful task persistence.
-- [ ] `400 INVALID_OPERATION_ENVELOPE`, `409 OPERATION_ID_REUSED`, `503 STORAGE_UNAVAILABLE`, and `500 INTERNAL_ERROR` are returned as `ProtocolError` values with no terminal `outcome`, and an internal error rolls back the active transaction and logs server-side without exposing an invented result.
-- [ ] A stored uniqueness rejection is returned unchanged on later consultation.
-- [ ] E2E tests cover stored success lookup, stored rejection lookup, unknown lookup, unparseable JSON, an unusable operation identity, and a simulated storage failure.
-- [ ] Gate check passes: `python -m pytest tests/server`.
-- [ ] Test count: at least 16 tests pass in `tests/server/integration/test_api_operations.py` (no silent deletions).
+- [ ] Build a wheel with `python -m build --no-isolation` using T2's locked build backend and install it with validated locked runtime dependencies in a fresh temporary environment. All smoke subprocesses run from a separate temporary directory without editable installation, checkout paths or PYTHONPATH fallback.
+- [ ] Verify the installed package contains `schema/001_initial.sql`; its initializer creates only a newly allocated disposable database with a readable schema version.
+- [ ] Launch `python -m uvicorn task_analyzer_server.app:application_factory --factory --host 127.0.0.1 --port <allocated-test-port>` with that database. Bounded readiness checks verify unconfigured configuration, zone setup, task creation and persisted reads after process restart.
+- [ ] Verify startup with an absent database fails visibly without creating it. Child processes and disposable resources are cleaned up even after assertion failures.
+- [ ] Build once per session, never invoke pytest recursively, and use locked dependency artifacts without resolving upgrades. No systemd, Tailscale or real-host changes occur.
+- [ ] Gate check passes: `python -m pytest tests/server`, including this suite; it runs under subsequent Build gates too.
+- [ ] Test count: at least 4 tests pass in `tests/server/integration/test_installed_distribution.py` (no silent deletions).
 
-**Tests**: e2e
+**Tests**: integration
 **Gate**: full
 
-**Commit**: `feat(server): add operation lookup and protocol errors`
+**Commit**: `test(server): verify installed distribution startup`
 
 ---
 
@@ -1015,7 +1022,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] The unit runs one Uvicorn worker on `127.0.0.1:8000` with no development reload, under a dedicated unprivileged `task-analyzer` account.
+- [ ] The unit runs one Uvicorn worker on `127.0.0.1:8000` using `task_analyzer_server.app:application_factory --factory`, with no development reload, under a dedicated unprivileged `task-analyzer` account.
 - [ ] It declares a writable state directory, a read-only installed application, restart-on-failure supervision, and the approved environment variables.
 - [ ] No real host name, credential, tailnet rule, or deployment step is executed by this task; the asset is a file only.
 - [ ] Gate check passes: the Build gate is run for the phase; the asset itself is not a lint or type target.
@@ -1047,7 +1054,7 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 - [ ] It states that the actual tailnet hostname, device identifiers, interpreter version set, and host paths must be confirmed in an authorized environment, and that running any step requires explicit deployment authorization.
 - [ ] It carries the pending confirmation handed over by T2: the locked dependency set must be re-checked against the interpreter actually installed on the target before the service is considered deployable.
 - [ ] It records that the target is the user's own server, not a disposable validation host: every install, service, and Tailscale step needs authorization at the time it is run, the first `initialize_database` call is authorized separately, and existing state is backed up before it.
-- [ ] The private-access acceptance check for PCE-46 and PCE-47 is recorded as a pending authorized-environment verification, not as a performed check.
+- [ ] The private-access acceptance check for PCE-46 and PCE-47 is pending authorized-environment verification. Local tasks may finish, but the feature cannot receive overall PASS or Verified status before target-interpreter gates and required private-access evidence pass in a later explicitly authorized verification session. Writing this guide does not satisfy that checkpoint.
 - [ ] It ends with an `Open questions` section, per the repository document rule.
 - [ ] Gate check passes: the Build gate is run for the phase; links and scope boundaries are checked against the approved documents.
 
@@ -1060,89 +1067,94 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 ## Phase Execution Map
 
-Phases run in sequence; tasks within a phase run in order. Execution is strictly sequential - there is no intra-phase parallelism.
+Phases and tasks execute sequentially in the listed order. T11 intentionally precedes T7; task IDs remain stable.
 
 ```
-Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 → Phase 6 → Phase 7 → Phase 8 → Phase 9
+Phase 1: T1, T2, T3, T4
+Phase 2: T5, T6
+Phase 3: T11, T7, T8, T9, T10
+Phase 4: T12
+Phase 5: T13, T14, T15, T16
+Phase 6: T17, T18, T19, T20, T21
+Phase 7: T22, T23, T24, T25, T26, T27
+Phase 8: T28, T29
+Phase 9: T30, T31
 ```
 
-Intra-phase ordering:
+Dependency edges (each arrow matches a task-body dependency):
 
 ```
-Phase 1:  T1 → T2 → T3
-Phase 1:  T2 → T4
-Phase 2:  T5 → T6
-Phase 3:  T7 → T8
-Phase 3:  T9 → T10
-Phase 4:  T11 → T12
-Phase 5:  T13 → T14
-Phase 5:  T13 → T15
-Phase 5:  T13 → T16
-Phase 6:  T17 → T19 → T20 → T21
-Phase 6:  T19 → T21
-Phase 7:  T22 → T23
-Phase 7:  T22 → T24
-Phase 7:  T22 → T25 → T26 → T27
-Phase 8:  T28 → T29
-Phase 9:  T30 → T31
-```
-
-Cross-phase dependency edges, drawn explicitly so the diagram and the task bodies stay in parity:
-
-```
+T1 → T2
+T2 → T3
+T2 → T4
 T2 → T5
-T2 → T7
+T5 → T6
+T2 → T11
+T11 → T7
+T7 → T8
 T2 → T9
-T7 → T11
+T9 → T10
+T11 → T12
 T6 → T13
+T13 → T14
+T13 → T15
 T8 → T15
+T13 → T16
 T12 → T16
 T16 → T17
 T11 → T17
 T14 → T18
 T9 → T18
+T17 → T19
 T15 → T19
 T7 → T19
+T19 → T20
+T19 → T21
+T20 → T21
 T3 → T22
 T4 → T22
 T13 → T22
 T14 → T22
+T17 → T22
+T12 → T22
+T22 → T23
 T18 → T23
 T12 → T23
+T22 → T24
 T15 → T24
 T12 → T24
+T22 → T25
 T19 → T25
 T11 → T25
+T25 → T26
+T26 → T27
+T6 → T27
 T22 → T28
 T26 → T28
 T6 → T28
+T28 → T29
 T3 → T30
 T22 → T30
+T30 → T31
 T6 → T31
 ```
 
-**Execution packing**: 31 tasks pack into five task-budgeted batches on phase boundaries - Phases 1-2 (6 tasks), Phase 3-4 (6 tasks), Phase 5 (4 tasks), Phase 6 (5 tasks), Phase 7 (6 tasks), Phases 8-9 (4 tasks). Because this exceeds one batch, Execute must present the sub-agent offer before dispatching, and the user decides. Batches run sequentially; no batch starts before the previous one reports every task complete. After the final task, the independent Verifier runs automatically and writes `validation.md`.
+**Execution packing**: 31 tasks can form four sequential batches: Phases 1-2 (6 tasks), Phases 3-4 (6 tasks), Phases 5-6 (9 tasks), Phases 7-9 (10 tasks). These approximate the seven-task budget without splitting phases or leaving a one/two-task tail. Offer sub-agents at Execute and wait for the user before dispatch. The independent Verifier runs after local implementation, but cannot mark the feature PASS while required external evidence is pending.
 
 ---
 
 ## Task Granularity Check
 
-| Task | Scope | Status |
+| Tasks | Scope | Assessment |
 | --- | --- | --- |
-| T1, T2 | 1 configuration file / 1 requirements set | Granular |
-| T3, T4 | 1 module each | Granular |
-| T5, T6 | 1 DDL asset / 1 initializer | Granular |
-| T7, T8 | 1 function each in `domain.py` | Granular |
-| T9, T10 | 1 cohesive clock unit / 1 cutoff function in `clock.py` | Granular |
-| T11, T12 | 1 cohesive model group each in `contracts.py` | Granular |
-| T13, T14, T15, T16 | 1 cohesive access concern each in `storage.py` | Granular |
-| T17, T18, T19, T20, T21 | 1 service operation or enforcement rule each in `services.py` | Granular |
-| T22 | 1 composition module | Granular |
-| T23, T24, T25, T26, T27 | 1 route group each in `api.py` | Granular |
-| T28, T29 | 1 cross-cutting scenario suite each | Granular |
-| T30, T31 | 1 deployment asset / 1 document | Granular |
+| T1/T2 | Configuration / dependency set | Each has an executable bootstrap gate. |
+| T3 through T21 | One cohesive module concern or function | Input types precede validation; initialization is independent of operational storage. |
+| T22 | One HTTP boundary across app.py and api.py | Composition, first real route and handlers are co-located to make this task testable without empty routers or deferred wiring. |
+| T23 through T26 | One route group per task | Includes happy, edge and error tests through the composed application. |
+| T27 through T29 | One cross-component scenario suite each | No production placeholder code. |
+| T30/T31 | Service asset / deployment guide | Local assets; external checks remain a completion checkpoint. |
 
-Every task names exactly one file in `Where`. Tasks that share a module (`domain.py`, `clock.py`, `contracts.py`, `storage.py`, `services.py`, `api.py`) are split at cohesive responsibility seams, which the skill permits for two or three related things in the same file.
+T22 deliberately spans two tightly coupled files as one application-boundary deliverable, following the TLC rule to merge blocking composition into the task that requires it. A mechanical multiple-file warning is reviewed against this concrete dependency; it does not defer tests.
 
 ---
 
@@ -1156,11 +1168,11 @@ Every task names exactly one file in `Where`. Tasks that share a module (`domain
 | T4 | T2 | T2 → T4 | Match |
 | T5 | T2 | T2 → T5 | Match |
 | T6 | T5 | T5 → T6 | Match |
-| T7 | T2 | T2 → T7 | Match |
+| T11 | T2 | T2 → T11 | Match |
+| T7 | T11 | T11 → T7 | Match |
 | T8 | T7 | T7 → T8 | Match |
 | T9 | T2 | T2 → T9 | Match |
 | T10 | T9 | T9 → T10 | Match |
-| T11 | T7 | T7 → T11 | Match |
 | T12 | T11 | T11 → T12 | Match |
 | T13 | T6 | T6 → T13 | Match |
 | T14 | T13 | T13 → T14 | Match |
@@ -1171,18 +1183,18 @@ Every task names exactly one file in `Where`. Tasks that share a module (`domain
 | T19 | T17, T15, T7 | T17 → T19, T15 → T19, T7 → T19 | Match |
 | T20 | T19 | T19 → T20 | Match |
 | T21 | T19, T20 | T19 → T21, T20 → T21 | Match |
-| T22 | T3, T4, T13, T14 | T3 → T22, T4 → T22, T13 → T22, T14 → T22 | Match |
+| T22 | T3, T4, T13, T14, T17, T12 | T3 → T22, T4 → T22, T13 → T22, T14 → T22, T17 → T22, T12 → T22 | Match |
 | T23 | T22, T18, T12 | T22 → T23, T18 → T23, T12 → T23 | Match |
 | T24 | T22, T15, T12 | T22 → T24, T15 → T24, T12 → T24 | Match |
 | T25 | T22, T19, T11 | T22 → T25, T19 → T25, T11 → T25 | Match |
 | T26 | T25 | T25 → T26 | Match |
-| T27 | T26 | T26 → T27 | Match |
+| T27 | T26, T6 | T26 → T27, T6 → T27 | Match |
 | T28 | T22, T26, T6 | T22 → T28, T26 → T28, T6 → T28 | Match |
 | T29 | T28 | T28 → T29 | Match |
 | T30 | T3, T22 | T3 → T30, T22 → T30 | Match |
 | T31 | T30, T6 | T30 → T31, T6 → T31 | Match |
 
-No task depends on a task in a later phase.
+No task depends on a later phase or later step in its own phase. Imports and test setup must respect these dependencies.
 
 ---
 
@@ -1190,39 +1202,39 @@ No task depends on a task in a later phase.
 
 | Task | Code Layer Created/Modified | Matrix Requires | Task Says | Status |
 | --- | --- | --- | --- | --- |
-| T1 | Packaging | none | none | OK |
-| T2 | Packaging | none | none | OK |
-| T3 | Runtime configuration | unit | unit | OK |
-| T4 | Runtime configuration | unit | unit | OK |
-| T5 | Persistence (DDL) | integration | integration | OK |
-| T6 | Persistence | integration | integration | OK |
-| T7 | Domain rules | unit | unit | OK |
-| T8 | Domain rules | unit | unit | OK |
-| T9 | Domain rules | unit | unit | OK |
-| T10 | Domain rules | unit | unit | OK |
-| T11 | Wire contracts | unit | unit | OK |
-| T12 | Wire contracts | unit | unit | OK |
-| T13 | Persistence | integration | integration | OK |
-| T14 | Persistence | integration | integration | OK |
-| T15 | Persistence | integration | integration | OK |
-| T16 | Persistence | integration | integration | OK |
-| T17 | Operation services | integration | integration | OK |
-| T18 | Operation services | integration | integration | OK |
-| T19 | Operation services | integration | integration | OK |
-| T20 | Operation services | integration | integration | OK |
-| T21 | Operation services | integration | integration | OK |
-| T22 | API composition | e2e | e2e | OK |
-| T23 | API | e2e | e2e | OK |
-| T24 | API | e2e | e2e | OK |
-| T25 | API | e2e | e2e | OK |
-| T26 | API | e2e | e2e | OK |
-| T27 | API | e2e | e2e | OK |
-| T28 | Cross-cutting scenario suite over services and API | integration | integration | OK |
-| T29 | Cross-cutting scenario suite over services and API | integration | integration | OK |
-| T30 | Deployment asset | none | none | OK |
-| T31 | Deployment document | none | none | OK |
+| T1 | Packaging/deployment | none | none | OK |
+| T2 | Packaging/deployment | none | none | OK |
+| T3 | Domain/contracts/configuration | unit | unit | OK |
+| T4 | Domain/contracts/configuration | unit | unit | OK |
+| T5 | Persistence/services/scenario suite | integration | integration | OK |
+| T6 | Persistence/services/scenario suite | integration | integration | OK |
+| T11 | Domain/contracts/configuration | unit | unit | OK |
+| T7 | Domain/contracts/configuration | unit | unit | OK |
+| T8 | Domain/contracts/configuration | unit | unit | OK |
+| T9 | Domain/contracts/configuration | unit | unit | OK |
+| T10 | Domain/contracts/configuration | unit | unit | OK |
+| T12 | Domain/contracts/configuration | unit | unit | OK |
+| T13 | Persistence/services/scenario suite | integration | integration | OK |
+| T14 | Persistence/services/scenario suite | integration | integration | OK |
+| T15 | Persistence/services/scenario suite | integration | integration | OK |
+| T16 | Persistence/services/scenario suite | integration | integration | OK |
+| T17 | Persistence/services/scenario suite | integration | integration | OK |
+| T18 | Persistence/services/scenario suite | integration | integration | OK |
+| T19 | Persistence/services/scenario suite | integration | integration | OK |
+| T20 | Persistence/services/scenario suite | integration | integration | OK |
+| T21 | Persistence/services/scenario suite | integration | integration | OK |
+| T22 | HTTP boundary/routes | e2e | e2e | OK |
+| T23 | HTTP boundary/routes | e2e | e2e | OK |
+| T24 | HTTP boundary/routes | e2e | e2e | OK |
+| T25 | HTTP boundary/routes | e2e | e2e | OK |
+| T26 | HTTP boundary/routes | e2e | e2e | OK |
+| T27 | Persistence/services/scenario suite | integration | integration | OK |
+| T28 | Persistence/services/scenario suite | integration | integration | OK |
+| T29 | Persistence/services/scenario suite | integration | integration | OK |
+| T30 | Packaging/deployment | none | none | OK |
+| T31 | Packaging/deployment | none | none | OK |
 
-`Tests: none` appears only where the matrix says none for that layer. No task defers its tests to a later task. T28 and T29 add no production code; they carry the restart, concurrency, and failure scenarios that span several modules and become runnable only once the API exists.
+T1/T2 check configuration/dependencies before application tests exist. T22 includes HTTP wiring and protocol tests; T23-T26 include each route's error paths. T27 verifies the installed distribution. T28/T29 add cross-cutting scenarios without deferring required tests from earlier production tasks.
 
 ---
 
@@ -1233,12 +1245,12 @@ No task depends on a task in a later phase.
 | PCE-01 through PCE-10, PCE-48, PCE-51, PCE-52 (creation and field bounds) | T7, T11, T19, T25 |
 | PCE-11 through PCE-16 (pending edits) | T7, T15, T20, T26 |
 | PCE-17 through PCE-27 (uniqueness) | T5, T8, T15, T21, T25, T26, T29 |
-| PCE-28 through PCE-33, PCE-49, PCE-50, PCE-51, PCE-52 (time, zone, cutoff) | T9, T10, T14, T18, T23 |
+| PCE-28 through PCE-33, PCE-49, PCE-50 (time, zone, cutoff) | T9, T10, T14, T18, T23 |
 | PCE-34, PCE-35, PCE-36 (durability and fresh sessions) | T6, T22, T24, T28 |
-| PCE-37 through PCE-43 (operation outcomes and recovery) | T13, T16, T17, T25, T26, T27, T29 |
-| PCE-44 through PCE-47 (runtime and private access) | T1, T2, T3, T22, T30, T31 |
+| PCE-37 through PCE-43 (operation outcomes and recovery) | T13, T16, T17, T22, T25, T26, T29 |
+| PCE-44 through PCE-47 (runtime and private access) | T1, T2, T3, T22, T27, T30, T31 |
 
-Every 1A criterion is carried by at least one task. PCE-46 and PCE-47 are only partly verifiable locally: T22 proves there is no product sign-in, while the private tailnet access check stays a pending verification in an explicitly authorized environment, recorded as such in T31 and in the Verifier's report.
+All 52 criteria have planned task coverage; this is not completed verification. PCE-46 and PCE-47 are only partly verifiable locally: T22 proves there is no product sign-in, while the private tailnet access check stays a pending verification in an explicitly authorized environment, recorded as such in T31 and in the Verifier's report.
 
 ## Open questions
 

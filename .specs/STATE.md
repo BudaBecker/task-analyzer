@@ -34,13 +34,14 @@ Approved product inputs remain in [Requirements](../docs/product/requirements.md
 ## Handoff
 
 - **Feature**: [Persistent task creation and editing](features/persistent-task-creation-editing/spec.md), delivery 1A.
-- **Phase / Task**: Documentation audit correction; no application task has started.
-- **Completed**: Documentation step D1: the user approved TIME-02 (entirely skipped following date) and TIME-03 (deadline range). Requirements, spec, context, design and task scenarios are synchronized; 52 PCE criteria retain all prior IDs and protected examples.
-- **Checks**: `validate_spec.py`: 0 errors, 0 warnings. `validate_tasks.py`: 0 errors, 4 expected packaging/deployment warnings. No application tests or deployment checks have run.
-- **Next step**: Documentation step D2: correct gates, dependency order, HTTP infrastructure, installed-package verification and stale project status; validate and commit locally.
-- **Authorization**: The user authorized documentation corrections and local commits only. Design revisions and implementation tasks are not approved for execution by this request.
-- **Deployment target**: The user's own Ubuntu server. Actual interpreter compatibility and private-access evidence remain pending separately authorized checks.
-- **Uncommitted files**: D1 changes are included in the commit carrying this snapshot; reconcile Git on resume.
+- **Phase / Task**: Documentation audit corrections complete. Behavioral clarifications are approved; the revised Design and formal Tasks await review/approval. No application task has started.
+- **Completed**: D1 (`bb0cd44`) records approved TIME-02/03, with 52 PCE criteria and all original scenario examples preserved. D2 (the commit carrying this snapshot) corrects bootstrap gates, one-way input/domain dependencies, independent initialization, the HTTP foundation, exact request correlation, installed-wheel verification and stale project status.
+- **Plan**: 31 unchecked implementation tasks in 9 phases; T11 precedes T7. T22 delivers the tested HTTP boundary across app.py/api.py; T27 verifies the installed distribution. Four proposed whole-phase batches are documented; worker delegation still requires the Execute-time offer and user choice.
+- **Checks**: validate_spec: 0 errors/0 warnings. validate_tasks: 0 errors/5 reviewed warnings (four none-test packaging/assets and T22's intentional two-file boundary). Semantic checks preserved every original product acceptance scenario, found exactly the approved PCE-08/09/50 wording changes plus PCE-51/52, verified 31 ordered task IDs, 176 local links/anchors and final Open questions headings. git diff --check passed. Application tests have not run.
+- **Next step**: Review the corrected Design and approve the task plan before any application implementation. Earlier AD-003 wording about task-plan approval records the runtime decision; it does not approve the current revised tasks.
+- **Deployment checkpoint**: The user's own Ubuntu server still requires supplied host values and explicit deployment/database authorization. Confirm its interpreter before creating/validating its target-specific lock; local Python 3.13 locks are not target evidence. Overall feature PASS/Verified remains blocked until the required runtime and private-access checks pass.
+- **Authorization**: Documentation and local commits only for this round. No push, merge, application implementation, deployment or real database changes.
+- **Uncommitted files**: The D2 documentation changes are included in the commit carrying this snapshot; reconcile Git on resume.
 - **Branch**: `docs/1a-audit-corrections`, based on merged `main` at `c052f35`.
 
 ## Open questions

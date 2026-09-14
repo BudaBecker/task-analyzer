@@ -2,7 +2,7 @@
 
 **Spec:** [Approved delivery 1A specification](spec.md).
 
-**Status:** Approved by the user on 2026-09-13. FastAPI, SQLite, and Ubuntu Server 26.04.1 LTS were already approved as architecture; this approval covers the API, schema, operation-consistency, time, runtime, dependency, and quality-gate details below. The user resolved TXT-01 as visual character counting and approved TIME-01's exceptional-midnight rule; both are reflected in the product requirements and spec. Implementation proceeds only through approved tasks.
+**Status:** Baseline approved on 2026-09-13; audit revision awaiting final Design review. The user authorized these documentation corrections and local commits, and explicitly approved TIME-02/03 in [context.md](context.md). Prior stack decisions remain active. The revised technical details and formal tasks must be approved before application implementation.
 
 **Boundary:** Creation and editing of pending tasks, fixed product time, server persistence, uniqueness, and original operation outcomes. No lifecycle commands from 1B, desktop implementation, metrics, or deadline-emphasis presentation are added.
 
@@ -22,7 +22,7 @@ flowchart LR
     storage --> database[("Local server database: tasks, configuration, outcomes")]
 ```
 
-The process supervisor, API details, SQLite settings, and additional dependencies in this document are covered by the Design approval recorded above. Actual deployment values, real-host configuration, and database changes still require separate authorization.
+The baseline process supervisor, API, SQLite settings and dependencies remain approved. The audit amendments below are ready for review; documentation commits do not authorize implementation or real-host/database changes.
 
 ### Architecture alternatives considered
 
@@ -61,24 +61,24 @@ Package root: `src/task-analyzer-server/task_analyzer_server/`.
 
 | Module | Responsibility | Proposed interface | Dependencies / reuse |
 | --- | --- | --- | --- |
-| `app.py` | Compose the app and verify startup configuration. | `create_app(settings: ServerSettings, clock: Clock) -> FastAPI` | API, services, settings; injectable clock for tests. |
+| `app.py` | Compose the app and verify startup configuration. | `create_app(settings: ServerSettings, clock: Clock) -> FastAPI`; `application_factory() -> FastAPI` | API, services, settings; injectable clock for tests. |
 | `api.py` | Parse HTTP envelopes, call services, and map stored/transport results. | FastAPI routes in the API table below. | Contracts and services; no task mutation logic. |
-| `contracts.py` | Request and response models with explicit serialization. | `TaskInput`, `TaskSnapshot`, `OperationResult`, `ProtocolError`, `ConfigurationView` | Pydantic; domain values mapped explicitly. |
-| `domain.py` | Validate task fields and derive title comparison keys. | `validate_task(data: TaskInput) -> tuple[ValidationIssue, ...]`; `title_key(title: str) -> str` | Python values and regex grapheme segmentation; approved visual-character semantics. |
+| `contracts.py` | Request and response models with explicit serialization. | `TaskInput`, `ValidationIssue`, `TaskSnapshot`, `OperationResult`, `ProtocolError`, `ConfigurationView` | Pydantic and immutable issue values; never imports domain or services. |
+| `domain.py` | Validate task fields and derive title comparison keys. | `validate_task(data: TaskInput) -> tuple[ValidationIssue, ...]`; `title_key(title: str) -> str` | Contract input/issue types and regex grapheme segmentation. Dependency is one-way from domain to contracts; structural and business validation remain distinct. |
 | `clock.py` | Supply UTC time, product date, and deadline cutoff conversion. | `Clock.now() -> datetime`; `deadline_cutoff(deadline: date, zone: ZoneInfo) -> datetime` | Standard `datetime` and `zoneinfo`; approved exceptional-midnight rule. |
-| `services.py` | Apply creation/editing and fixed-zone setup as transactions. | `apply_operation(request: OperationRequest) -> OperationResult`; `configure_zone(zone_key: str) -> ConfigurationView` | Storage, domain, clock. Shared runner is reusable by 1B. |
+| `services.py` | Apply creation/editing and fixed-zone setup as transactions. | `apply_operation(request: OperationRequest) -> OperationResult`; `configure_zone(zone_key: str) -> ConfigurationView`; `lookup_operation(operation_id: UUID) -> OperationResult \| None` | Storage, domain, clock. Shared runner is reusable by 1B. |
 | `storage.py` | Own connections, SQL statements, transaction completion, and reads. | `read_operation(operation_id: UUID) -> OperationResult \| None`; `read_tasks() -> tuple[TaskSnapshot, ...]` | Standard `sqlite3`; parameterized SQL only. |
 | `settings.py` | Validate explicit runtime configuration. | `ServerSettings` | Standard environment/path handling. No default to a developer or production database during tests. |
 | `logging_config.py` | Format standard logging records as JSON lines. | `configure_logging(level: str) -> None` | Standard `logging` and `json`. |
-| `schema.py`, `schema/001_initial.sql` | Provide an explicit initialization entry point and versioned initial schema. | `initialize_database(path: Path) -> None` | Storage helpers. Execution on real databases needs separate authorization. |
+| `schema.py`, `schema/001_initial.sql` | Provide an explicit initialization entry point and versioned initial schema. | `initialize_database(path: Path) -> None` | Standard sqlite3 and importlib.resources directly; no dependency on operational storage helpers. Execution on real databases needs separate authorization. |
 
-`OperationRequest` binds an operation UUID, method, canonical target path, and parsed JSON payload. `Clock` is the only service dependency needing a substitutable time source; storage tests use real disposable SQLite files. These are interface contracts, not implementation stubs.
+`OperationRequest` binds an operation UUID, method, canonical target path, and parsed JSON payload. `Clock` is the only service dependency needing a substitutable time source; storage tests use real disposable SQLite files. These are interface contracts, not implementation stubs. Define TaskInput and ValidationIssue before validate_task; contracts never import that validator. The schema initializer reads packaged SQL independently of operational storage. Deliver app.py and api.py together as one HTTP boundary with operation lookup and error handlers, so every later route can be verified through the composed application immediately.
 
 ### Proposed supporting locations
 
 | Location | Purpose |
 | --- | --- |
-| `pyproject.toml` | Server package discovery, Python baseline, direct dependencies, and tool configuration. No client tool configuration. |
+| `pyproject.toml` | Server package discovery, Python baseline, direct dependencies, and tool configuration. No client tool configuration. Explicit package data includes `task_analyzer_server = ["schema/*.sql"]`. |
 | `requirements/server.in`, `requirements/dev.in`, generated lock files under `requirements/` | Reproducible dependency inputs and environment-specific, hash-pinned resolutions. |
 | `tests/server/unit/` | Field validation, title comparison, time rules, and wire serialization. |
 | `tests/server/integration/` | API outcomes, SQLite constraints, durability, restarts, and overlapping requests. |
@@ -119,7 +119,7 @@ Create two unique partial indexes, using the precomputed application title key w
 
 The service checks for a conflicting row while holding the write transaction, excluding the edited task ID. The indexes enforce the same combinations if a competing write reaches storage. SQLite supports uniqueness on a selected subset of rows through [unique partial indexes](https://www.sqlite.org/partialindex.html#unique_partial_indexes).
 
-Do not rely on SQLite's default case comparison to implement the product rule. TXT-01 must resolve the exact Unicode counting/comparison contract before `title_key` is finalized. Store submitted text independently of its comparison key; internal-space normalization is for comparison, not an instruction to rewrite observations or display text.
+Do not rely on SQLite's default case comparison to implement the product rule. TXT-01 is resolved by the approved grapheme-counting and comparison rules above. Store submitted text independently of its comparison key; internal-space normalization is for comparison, not an instruction to rewrite observations or display text.
 
 ### SQLite connection and durability policy
 
@@ -214,7 +214,7 @@ Canonical requests include API version, method, canonical task target, and parse
 | Task-list response | `items` array of TaskSnapshot plus `product_time_zone`, `server_now`, and `product_date`. The array is empty for an empty collection. |
 | `OperationResult` | `operation_id`, `outcome`, `original_http_status`, `task` nullable TaskSnapshot, `error` nullable OperationError, `resolved_at` UTC instant. Exactly one of `task` and `error` is non-null. |
 | `OperationError` | `code` stable string, `fields` array of `{field, code}` issues (empty for a non-field error), `conflicting_task_id` nullable UUID. |
-| `ProtocolError` | `error` containing `code` and `fields`, plus `operation_id` when a valid ID was supplied. No terminal `outcome` is present. |
+| `ProtocolError` | `request_id` (nonempty server-generated UUID text for this HTTP request), `error` containing `code` and `fields`, plus `operation_id` only when a usable ID was supplied. No terminal `outcome` is present. The same request_id appears in the corresponding log record; it is not the operation ID or a field of the immutable OperationResult. |
 
 Field-error codes include `TITLE_REQUIRED`, `TITLE_TOO_LONG`, `OBSERVATIONS_TOO_LONG`, `INVALID_DEADLINE`, `INVALID_FIELD_TYPE`, and `UNEXPECTED_FIELD`. The application translates framework errors into these stable codes; framework-specific error objects and echoed input are not the desktop contract. Prepare and validate the terminal JSON representation inside the transaction before storing it, then send that stored representation after commit.
 
@@ -271,7 +271,7 @@ The configured zone remains fixed even if the desktop's zone or the server host'
 
 ## Runtime, Private Access, and Logging
 
-Propose a Python virtual environment installed on Ubuntu Server 26.04.1 LTS, supervised by systemd, running one Uvicorn worker on `127.0.0.1:8000`. Use the standard asyncio loop and no development reload. Keep SQLite entirely on the server's local disk. Uvicorn supports explicit host/port/worker settings. [Uvicorn settings source](https://github.com/encode/uvicorn/blob/main/docs/settings.md).
+Use a Python virtual environment on Ubuntu Server 26.04.1 LTS, supervised by systemd, running one Uvicorn worker on `127.0.0.1:8000`. The revised runtime entry is `python -m uvicorn task_analyzer_server.app:application_factory --factory --host 127.0.0.1 --port 8000`. The zero-argument factory constructs ServerSettings and the default Clock, then calls the existing injectable create_app(settings, clock). Neither factory initializes a database. Use the standard asyncio loop and no development reload. Keep SQLite entirely on the server's local disk. Uvicorn supports explicit host/port/worker settings. [Uvicorn settings source](https://github.com/encode/uvicorn/blob/main/docs/settings.md).
 
 Propose Tailscale Serve as the tailnet-only HTTPS reverse proxy to that loopback listener. Use a dedicated tailnet device name and access policy allowing the user's desktop to reach this service. The application has no product sign-in and does not treat forwarded identity headers as product accounts. Tailscale Serve's persistent background mode resumes after reboot. [Tailscale Serve](https://tailscale.com/docs/reference/tailscale-cli/serve).
 
@@ -295,11 +295,13 @@ Structured logs use standard `logging` with JSON-line output: `timestamp`, `leve
 | Formatting / lint / types | Ruff formatter/linter and mypy strict checking for the server. | Approved 2026-09-13. |
 | Packaging / locking | Standard venv/pip, setuptools, build, and pip-tools. Pin exact compatible versions and hashes in per-environment lock files during the dependency task. | Approved 2026-09-13. |
 
-FastAPI/Pydantic dependencies are resolved together; do not independently upgrade Starlette underneath the validated combination. Exact patch versions are not invented in this document. The dependency task must resolve released versions compatible with Python 3.13 and the selected Ubuntu interpreter, lock them, and run the same gates on each supported environment. Any incompatible dependency requires a proposal revision rather than silently raising the Python minimum.
+FastAPI/Pydantic dependencies are resolved together; do not independently upgrade Starlette underneath the validated combination. Exact patch versions are not invented in this document. T2 includes setuptools in the locked development toolchain so wheel builds can use `--no-isolation` without resolving a different backend. T2 resolves and hash-locks the local Python 3.13 environment, recording its OS/architecture/interpreter in requirements/README.md. It does not claim that a Windows lock is valid on Ubuntu. Confirm the actual Ubuntu interpreter before producing/validating the target-specific lock, satisfying AD-003's host compatibility prerequisite. Target locks and the same gates on that environment remain a mandatory authorized-deployment checkpoint; local task completion cannot substitute for them. Any incompatible dependency requires a proposal revision rather than silently raising the Python minimum.
 
 Use Ruff with a 79-character code limit, Google docstring convention, import ordering, and error/unused-code checks; mypy strict for server source. Exclude installed skill bundles from application lint/type targets. Test functions also use annotations and docstrings under AGENTS.md. [Ruff](https://docs.astral.sh/ruff/), [mypy](https://mypy.readthedocs.io/en/stable/getting_started.html), [Pydantic strict mode](https://pydantic.dev/docs/validation/latest/concepts/strict_mode/).
 
-Proposed gates, from the repository root after dependencies/configuration exist:
+The task plan defines two initial bootstrap gates: T1 validates the TOML configuration and named settings; T2 installs the hash-locked environment and verifies tool invocations and dependency consistency. Neither claims missing application tests as passing. At Phase 1 completion, T3/T4 supply substantive source and tests, and the full gates below become mandatory. No nonzero exit, missing target or empty test collection is accepted as success.
+
+Full gates, from the repository root after that foundation exists:
 
 | Gate | Command / evidence |
 | --- | --- |
@@ -307,7 +309,7 @@ Proposed gates, from the repository root after dependencies/configuration exist:
 | Lint | `python -m ruff check src/task-analyzer-server tests/server` |
 | Formatting | `python -m ruff format --check src/task-analyzer-server tests/server` |
 | Types | `python -m mypy --strict src/task-analyzer-server/task_analyzer_server` |
-| Build | `python -m build` and install/import the built wheel in an isolated environment. |
+| Build | `python -m build --no-isolation` using the locked build backend, and install/import the built wheel in an isolated environment. From T27, the test gate also initializes a disposable database and launches the runtime factory using only the installed wheel, outside the checkout. |
 | Dependency consistency | `python -m pip check` in each locked environment. |
 | Private deployment | Service startup/restart, configuration retention, and access from an authorized desktop through Tailscale. The user confirmed on 2026-09-13 that this runs on their own Ubuntu server: no disposable validation host is used, so every step needs explicit deployment authorization when it is performed, and the first database initialization is authorized separately from the deployment itself. |
 
@@ -322,10 +324,14 @@ Tests use a newly allocated temporary directory and a clearly identified disposa
 | Field validation / API validation | PCE-01 through PCE-10, PCE-15, PCE-16, PCE-48, PCE-51, PCE-52 | REQ-007, REQ-008, REQ-010, REQ-011 | Exact bounds, optional fields, multiline text, past/invalid dates; invalid edits preserve the whole task. Include combined-character/emoji fixtures under the approved TXT-01 rule. |
 | Pending edits | PCE-11 through PCE-16 | REQ-007, REQ-008, REQ-010, REQ-028, REQ-029 | Stable identity/creation time/status; full editable-state replacement and optional clearing. |
 | Uniqueness / competing writes | PCE-17 through PCE-27 | REQ-008, REQ-029, REQ-031 | Full comparison populations and protected title examples; one conflicting result accepted at most. |
-| Clock / configuration / cutoff | PCE-28 through PCE-33, PCE-35, PCE-49, PCE-50, PCE-51, PCE-52 | REQ-011, REQ-028 | Server clock, fixed zone, retained setup, approved September cutoff, and independently grounded exceptional-midnight fixtures. |
+| Clock / configuration / cutoff | PCE-28 through PCE-33, PCE-35, PCE-49, PCE-50 | REQ-011, REQ-028 | Server clock, fixed zone, retained setup, approved September cutoff, and independently grounded exceptional-midnight fixtures. |
 | Durability / fresh sessions | PCE-34 through PCE-36 | REQ-010, REQ-028 | Task changes and zone survive a new server process and client session. |
 | Outcome ledger / fault injection | PCE-37 through PCE-43 | REQ-010, REQ-029, REQ-031 | Lost response, same-ID overlap, different-ID conflict, immutable rejection, old edit replay, before/after-commit crashes. |
 | Runtime / access | PCE-44 through PCE-47 | REQ-003, REQ-027 | Minimum runtime and selected Ubuntu validation; private access with no product sign-in. |
+
+T22 supplies composition, handlers and operation lookup in one self-testable HTTP boundary. T23-T26 exercise each new route's applicable error paths in the same task, including malformed-envelope, field-validation, conflict and infrastructure cases for task commands; T27 is an installed-distribution suite, not deferred protocol coverage. It asserts packaged SQL, disposable initialization, factory startup and persistence across restart without an editable-install or checkout fallback.
+
+The Verifier may report successful local checks while the overall feature remains incomplete. An overall PASS, Verified traceability and validate_state completion require the actual target-interpreter and private-access evidence. T31 documents the pending externally authorized checkpoint; documentation alone cannot satisfy PCE-47.
 
 Each concrete test records its REQ and PCE IDs. Tasks must map every criterion to exact test cases and per-task gates. Tests assert spec outcomes, not calls to internal methods. A restart/crash test does not substitute for a physical power-loss claim; durability also depends on filesystem/device synchronization semantics. The independent Verifier and discrimination sensor run after implementation, not as a placeholder Design report.
 
@@ -359,7 +365,7 @@ Only qualifying project-level decisions belong in the active decision log; [AD-0
 
 ## Open questions
 
-- **Behavioral clarifications resolved:** TXT-01 uses user-perceived characters; TIME-01 uses the first repeated midnight or the first valid instant when midnight is absent. The user approved both; REQ-007/011 clarifications and PCE-48/49/50 preserve the existing scenarios and IDs.
-- **Detailed design approved (2026-09-13):** The API, full-edit representation, operation identity and reuse rules, indefinite result retention, schema, SQLite settings, process supervision, dependency list, layout, logging, and verification gates are approved. Execute still requires task approval; exact dependency versions are resolved and pinned during the first tasks.
+- **Behavioral clarifications resolved:** TXT-01 uses user-perceived characters; TIME-01 uses the first repeated midnight or first valid instant when midnight is absent. TIME-02 extends this to an entirely skipped following date, and TIME-03 fixes the supported deadline range; both are explicitly approved in context.md. All original scenario examples and IDs remain; PCE-51/52 add the approved date-range checks.
+- **Audit revision awaiting final review:** The approved baseline remains the reference. Review the one-way input/domain dependency, standalone initializer, self-testable HTTP foundation, explicit request_id field, zero-argument runtime factory, packaged SQL smoke test and executable bootstrap gates before approving the revised task plan. No implementation task is authorized yet.
 - **Deployment values:** The target is the user's own Ubuntu server (confirmed 2026-09-13). The actual tailnet hostname, device access identifiers, installed interpreter/version set, and host paths must still be supplied by the user before deployment. Because validation happens on the real host rather than a disposable one, no step is performed until the user authorizes that specific step, and existing state is backed up before the first database initialization. Local work through the end of the task plan does not touch that host.
 - **Later features:** Windows client technology, its Windows-to-IANA zone mapping, visual refresh scheduling, and 1B's transition/deletion implementation remain with their respective designs.
