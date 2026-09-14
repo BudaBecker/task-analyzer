@@ -225,7 +225,7 @@ The following are verification obligations linked to existing criteria, not addi
 
 | Requirement ID | Acceptance criteria / story | Coverage in 1A and remaining allocation | Phase | Status |
 | --- | --- | --- | --- | --- |
-| REQ-003 | PCE-44, PCE-45 | Server runtime/self-hosting constraints. Design baseline approved; audit revision and implementation verification pending. | Tasks | In Tasks |
+| REQ-003 | PCE-44, PCE-45 | Server runtime/self-hosting constraints. Design baseline approved; audit revision and implementation verification pending. | Execute | In Execute |
 | REQ-007 | PCE-01 through PCE-10, PCE-11, PCE-14 through PCE-16, PCE-48, PCE-51, PCE-52 | Task fields, visual-character bounds, pending creation, and pending edits. Completed-task behavior belongs to 1B; input UI belongs to desktop. | Tasks | In Tasks |
 | REQ-008 | PCE-01, PCE-11, PCE-12, PCE-14 through PCE-16, PCE-27, PCE-52 | Creation and pending edits only. Remaining lifecycle operations belong to 1B; end-to-end actions require desktop. | Tasks | In Tasks |
 | REQ-010 | PCE-07, PCE-11, PCE-16, PCE-34, PCE-36, PCE-37, PCE-40 | Durability of this delivery's operations. Extend to 1B operations and verify desktop confirmation separately. | Tasks | In Tasks |

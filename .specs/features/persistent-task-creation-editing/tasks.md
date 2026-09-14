@@ -138,7 +138,7 @@ T30 → T31
 
 Every task carries the PCE and REQ IDs it serves, keeps its tests in the same task, and leaves persisted behaviour unchanged for rejected operations. No MCP server and no additional skill are used in this delivery - the user confirmed on 2026-09-13 that neither is needed. The `tlc-spec-driven` skill still drives the Execute flow itself, and the Knowledge Verification Chain relies on the codebase, the project documents, and the official documentation already cited in the design.
 
-### T1: Configure the server package and tool baseline
+### T1: Configure the server package and tool baseline [Complete]
 
 **What**: Add the root `pyproject.toml` declaring the server package, the Python 3.13 minimum, direct runtime dependencies, and the approved Ruff, mypy, and pytest configuration.
 **Where**: `pyproject.toml`
@@ -153,12 +153,12 @@ Every task carries the PCE and REQ IDs it serves, keeps its tests in the same ta
 
 **Done when**:
 
-- [ ] `requires-python = ">=3.13"` and package discovery targets `src/task-analyzer-server/task_analyzer_server`; `task_analyzer_server` package data includes `schema/*.sql`. The metadata does not claim source already exists.
-- [ ] Direct runtime dependencies are declared: FastAPI, Uvicorn, Pydantic v2, `regex`, and `tzdata`; no exact versions are invented here - T2 resolves and pins them.
-- [ ] Ruff (line length 79, Google docstrings, import ordering, error and unused-code rules), mypy strict for the server package, and pytest `testpaths = ["tests/server"]` are configured; `.ai/` skill bundles are excluded from lint and type targets.
-- [ ] No client or desktop tooling is configured.
-- [ ] The bootstrap-configuration command passes and the review checks each named tool setting; no application import or test is claimed before substantive source exists.
-- [ ] Gate check passes: Bootstrap configuration. Editable installation and full Build are verified after T3/T4 before Phase 1 completes.
+- [x] `requires-python = ">=3.13"` and package discovery targets `src/task-analyzer-server/task_analyzer_server`; `task_analyzer_server` package data includes `schema/*.sql`. The metadata does not claim source already exists.
+- [x] Direct runtime dependencies are declared: FastAPI, Uvicorn, Pydantic v2, `regex`, and `tzdata`; no exact versions are invented here - T2 resolves and pins them.
+- [x] Ruff (line length 79, Google docstrings, import ordering, error and unused-code rules), mypy strict for the server package, and pytest `testpaths = ["tests/server"]` are configured; `.ai/` skill bundles are excluded from lint and type targets.
+- [x] No client or desktop tooling is configured.
+- [x] The bootstrap-configuration command passes and the review checks each named tool setting; no application import or test is claimed before substantive source exists.
+- [x] Gate check passes: Bootstrap configuration. Editable installation and full Build are verified after T3/T4 before Phase 1 completes.
 
 **Tests**: none
 **Gate**: bootstrap configuration
