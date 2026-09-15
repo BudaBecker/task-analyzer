@@ -42,11 +42,11 @@ Approved product inputs remain in [Requirements](../docs/product/requirements.md
 
 ## Handoff
 
-- **Work**: Project simplification is complete and merged. See [maintenance](../docs/maintenance.md) for results.
-- **Branch**: `main` at the published simplification merge.
-- **Next step**: Agree on the concise delivery 1B boundary, then write its lightweight behavioral specification.
+- **Work**: Delivery 1B behavioral specification drafted after the merged project simplification.
+- **Branch**: `docs/task-lifecycle-deletion` from published `main`.
+- **Next step**: Review and approve the concise [1B specification](features/task-lifecycle-deletion/spec.md), then write only the required Design delta.
 - **Result**: uv and `.venv` are established; F1-F5 are fixed; active documentation, source commentary and duplicate tests are reduced. The final 393-case suite and quality/build checks pass.
-- **Authorization**: Maintenance was merged and published. Delivery 1B implementation is not yet authorized.
+- **Authorization**: Drafting the 1B specification and a local documentation commit. Design and implementation are not yet authorized.
 - **Existing local change**: `.specs/features/.gitkeep` was already deleted before maintenance; preserve it separately from maintenance commits.
 - **External checks**: Actual Ubuntu interpreter/lock and Tailscale access remain pending; local maintenance completion does not claim deployment verification.
 
