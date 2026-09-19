@@ -4,7 +4,7 @@ A personal learning and portfolio project for task management and productivity a
 
 ## Current project status
 
-Delivery 1A implements task creation, pending-task editing, validation, uniqueness, fixed product time and recoverable operation results. New features are paused while the approved [simplification](docs/maintenance.md) is completed. The Windows client and later lifecycle/analysis features are not implemented.
+Delivery 1A implements task creation, pending-task editing, validation, uniqueness, fixed product time and recoverable operation results. Delivery 1B adds the remaining server-side lifecycle: completing a task, editing the observations of a completed task, reopening it and deleting a managed task. The Windows client, deadline emphasis and productivity analysis are not implemented.
 
 Stack: Python 3.13+, FastAPI, SQLite and uv. Dedicated Ubuntu hosting and private Tailscale access remain planned; actual host verification has not run.
 
@@ -32,6 +32,8 @@ uv run uvicorn task_analyzer_server.app:application_factory --factory --host 127
 
 Open `http://127.0.0.1:8000/docs`. First set the product time zone with `PUT /v1/configuration`, for example `{"product_time_zone":"America/Sao_Paulo"}`. Then create tasks with `POST /v1/tasks`, a fresh UUID in `Operation-Id` and `{"title":"Read notes"}`. Replay the same attempt with the same ID and body; use a new ID for a new action.
 
+The lifecycle commands take the same envelope and an exact JSON body: `POST /v1/tasks/{task_id}/completion` with `{}`, `PUT /v1/tasks/{task_id}/observations` with `{"observations":"..."}` or `{"observations":null}`, `POST /v1/tasks/{task_id}/reopening` with `{}`, and `DELETE /v1/tasks/{task_id}` with `{}`. A successful deletion answers with the task's final snapshot, and `GET /v1/operations/{operation_id}` still recovers any original result.
+
 ## Quality checks
 
 ```powershell
@@ -51,10 +53,11 @@ The suite includes isolated SQLite, restart, concurrency and installed-wheel tes
 - [Current handoff and shared decisions](.specs/STATE.md): where to resume.
 - [Product requirements](docs/product/requirements.md), [scope](docs/product/scope.md), and [backlog](docs/product/backlog.md): behavior and boundaries.
 - [1A specification](.specs/features/persistent-task-creation-editing/spec.md) and [design](.specs/features/persistent-task-creation-editing/design.md): accepted behavior and server contracts.
+- [1B specification](.specs/features/task-lifecycle-deletion/spec.md) and [design](.specs/features/task-lifecycle-deletion/design.md): the task lifecycle and deletion delta.
 - [Deployment](docs/architecture/deployment/server.md): the separately authorized Ubuntu/Tailscale procedure.
 
 Application modules live in `src/task-analyzer-server/task_analyzer_server/`; tests live in `tests/server/`. The bundled `.ai/skills/tlc-spec-driven/` is optional historical study material, not the active development workflow. Old plans and audit details remain available in Git at `8c68d6a`.
 
 ## Open questions
 
-Target-host values, Windows client technology and later feature contracts remain open. New features stay paused until this maintenance is reviewed.
+Target-host values, Windows client technology and later feature contracts remain open. Deadline emphasis and productivity analysis are not started.

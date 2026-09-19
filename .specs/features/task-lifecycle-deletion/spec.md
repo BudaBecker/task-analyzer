@@ -1,6 +1,6 @@
 # Task lifecycle and deletion
 
-Delivery 1B draft. This specification extends [delivery 1A](../persistent-task-creation-editing/spec.md) with the remaining server-side task lifecycle. Product inputs are [requirements](../../../docs/product/requirements.md) and [scope](../../../docs/product/scope.md).
+Delivery 1B. This specification extends [delivery 1A](../persistent-task-creation-editing/spec.md) with the remaining server-side task lifecycle. Product inputs are [requirements](../../../docs/product/requirements.md) and [scope](../../../docs/product/scope.md).
 
 ## Scope
 
@@ -83,4 +83,4 @@ This delivery establishes state needed by deadline emphasis and productivity met
 
 ## Open questions
 
-No unresolved product behavior is assumed. The Design must choose concise HTTP commands and response shapes for completion, completed-observation editing, reopening and deletion, including whether successful deletion returns a final snapshot. Those wire choices must reuse the 1A operation envelope and stable error model.
+None. The [Design](design.md) settled the HTTP commands, their exact bodies and the final snapshot a successful deletion returns, all on the 1A operation envelope and stable error model.

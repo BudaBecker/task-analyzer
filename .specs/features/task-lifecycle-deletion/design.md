@@ -38,6 +38,8 @@ Add strict command-input contracts, API handlers and service/storage operations 
 
 Test through service and HTTP boundaries against new disposable SQLite paths. Cover each accepted transition, every incompatible/absent/deleted rejection, observation boundaries, conflict on reopening, deletion's uniqueness effect, same-request replay, changed-ID reuse, restart recovery, rollback behavior, and concurrent incompatible lifecycle commands. Preserve all 1A regressions and run the README quality checks after implementation.
 
+A dated collision cannot survive to be found when a task reopens, because the dated index is unique across both statuses. The reopening check stays as the backstop that would report it, and the tests prove the dated rule still holds across the transition.
+
 Explicit regression scenarios:
 
 - Complete a task, reopen it, delete it, then repeat the original completion request with its original operation ID. Return exactly the stored completion result without changing or recreating the task; managed reads must still exclude it.

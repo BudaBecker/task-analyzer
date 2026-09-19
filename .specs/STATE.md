@@ -42,12 +42,12 @@ Approved product inputs remain in [Requirements](../docs/product/requirements.md
 
 ## Handoff
 
-- **Work**: Delivery 1B behavioral specification and technical Design delta drafted after the merged project simplification.
+- **Work**: Delivery 1B implemented against its approved [specification](features/task-lifecycle-deletion/spec.md) and [Design delta](features/task-lifecycle-deletion/design.md): completion, completed-observation editing, reopening and deletion.
 - **Branch**: `docs/task-lifecycle-deletion` from published `main`.
-- **Next step**: Review and approve the concise [1B specification](features/task-lifecycle-deletion/spec.md) and [Design delta](features/task-lifecycle-deletion/design.md), then implement the lifecycle commands in small verified steps.
-- **Result**: uv and `.venv` are established; F1-F5 are fixed; active documentation, source commentary and duplicate tests are reduced. The final 393-case suite and quality/build checks pass.
-- **Authorization**: The 1B specification and Design drafts are authorized; implementation is not yet authorized.
-- **External checks**: Actual Ubuntu interpreter/lock and Tailscale access remain pending; local maintenance completion does not claim deployment verification.
+- **Next step**: Review the delivered lifecycle commands, then choose the next feature. Deadline emphasis and productivity analysis are unstarted, and the Windows client remains undecided.
+- **Result**: The four commands reuse the 1A envelope, `BEGIN IMMEDIATE` transaction and operation ledger; no schema change or migration was needed. The suite grew from 393 to 487 cases and the README quality and build checks pass.
+- **Authorization**: The 1B implementation and its local commits are authorized. No push, merge or deployment is.
+- **External checks**: Actual Ubuntu interpreter/lock and Tailscale access remain pending; a passing local suite does not claim target-host or private-access verification.
 
 ## Open questions
 
