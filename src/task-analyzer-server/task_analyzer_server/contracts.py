@@ -1,7 +1,8 @@
 """Wire contracts for the Task Analyzer server.
 
 Covers PCE-01, PCE-10, PCE-11, PCE-16, PCE-26, PCE-38, PCE-40, PCE-41,
-PCE-43 and PCE-48 (REQ-007, REQ-008, REQ-010, REQ-029, REQ-031).
+PCE-43 and PCE-48 (REQ-007, REQ-008, REQ-010, REQ-029, REQ-031) and the
+lifecycle command inputs TLD-06, TLD-11 and TLD-13 (REQ-009).
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, TypeVar
 from uuid import UUID
 
 from pydantic import (
@@ -32,6 +33,8 @@ OPERATION_ID_FIELD = "operation_id"
 
 _EXTRA_FORBIDDEN_ERROR = "extra_forbidden"
 _MISSING_ERROR = "missing"
+
+_InputT = TypeVar("_InputT", bound=BaseModel)
 
 
 class FieldErrorCode(StrEnum):
@@ -105,6 +108,20 @@ class TaskInput(BaseModel):
     title: str
     observations: str | None = None
     deadline: str | None = None
+
+
+class EmptyCommandInput(BaseModel):
+    """A lifecycle command whose payload carries no fields."""
+
+    model_config = ConfigDict(frozen=True, strict=True, extra="forbid")
+
+
+class ObservationsInput(BaseModel):
+    """The only field a completed-task observation edit may carry."""
+
+    model_config = ConfigDict(frozen=True, strict=True, extra="forbid")
+
+    observations: str | None
 
 
 class TaskInputError(ValueError):
@@ -224,8 +241,23 @@ class ProtocolError(BaseModel):
 
 def parse_task_input(payload: object) -> TaskInput:
     """Parse a submitted payload into the approved task input."""
+    return _parse(TaskInput, payload)
+
+
+def parse_empty_command(payload: object) -> None:
+    """Confirm a lifecycle payload carries exactly no fields."""
+    _parse(EmptyCommandInput, payload)
+
+
+def parse_observations_input(payload: object) -> ObservationsInput:
+    """Parse a submitted payload into the observation-only input."""
+    return _parse(ObservationsInput, payload)
+
+
+def _parse(model: type[_InputT], payload: object) -> _InputT:
+    """Parse one submitted payload into a strict input contract."""
     try:
-        return TaskInput.model_validate(payload)
+        return model.model_validate(payload)
     except ValidationError as failure:
         raise TaskInputError(_translate(failure)) from None
 

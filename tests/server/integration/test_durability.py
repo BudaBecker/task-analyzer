@@ -1,6 +1,7 @@
 """Integration tests for durability across restarts and sessions.
 
-Covers PCE-34, PCE-35, PCE-36; REQ-010, REQ-028.
+Covers PCE-34, PCE-35, PCE-36 and the lifecycle persistence TLD-28,
+TLD-29 and TLD-31; REQ-010, REQ-028, REQ-031.
 """
 
 import os
@@ -162,6 +163,22 @@ def edit(base_url: str, task_id: str, payload: object) -> httpx.Response:
             f"{base_url}{TASKS_ROUTE}/{task_id}",
             json=payload,
             headers={"Operation-Id": str(uuid4())},
+        )
+
+
+def lifecycle(
+    base_url: str,
+    method: str,
+    route: str,
+    operation_id: UUID | None = None,
+) -> httpx.Response:
+    identity = uuid4() if operation_id is None else operation_id
+    with httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:
+        return client.request(
+            method,
+            f"{base_url}{route}",
+            json={},
+            headers={"Operation-Id": str(identity)},
         )
 
 
@@ -361,3 +378,113 @@ def test_a_disposable_server_never_falls_back_to_a_runtime_database(
     assert created.status_code == 201
     assert database.stat().st_size > 0
     assert not Path("C:/runtime/production.db").exists()
+
+
+def test_a_completed_task_survives_a_new_server_process(
+    database: Path, tmp_path: Path
+) -> None:
+    with running_server(database, tmp_path) as first:
+        configure(first)
+        created = create(first, {"title": ORIGINAL_TITLE})
+        task_id = str(created.json()["task"]["task_id"])
+        completed = lifecycle(
+            first, "POST", f"{TASKS_ROUTE}/{task_id}/completion"
+        )
+    with running_server(database, tmp_path) as second:
+        survivor = only_task(second)
+
+    assert completed.status_code == 200
+    assert survivor == completed.json()["task"]
+    assert survivor["status"] == "completed"
+
+
+def test_a_reopened_task_survives_a_new_server_process(
+    database: Path, tmp_path: Path
+) -> None:
+    with running_server(database, tmp_path) as first:
+        configure(first)
+        created = create(first, {"title": ORIGINAL_TITLE})
+        task_id = str(created.json()["task"]["task_id"])
+        lifecycle(first, "POST", f"{TASKS_ROUTE}/{task_id}/completion")
+        reopened = lifecycle(
+            first, "POST", f"{TASKS_ROUTE}/{task_id}/reopening"
+        )
+    with running_server(database, tmp_path) as second:
+        survivor = only_task(second)
+
+    assert reopened.status_code == 200
+    assert survivor["status"] == "pending"
+    assert survivor["completed_at"] is None
+    assert survivor["created_at"] == created.json()["task"]["created_at"]
+
+
+def test_edited_completed_observations_survive_a_restart(
+    database: Path, tmp_path: Path
+) -> None:
+    with running_server(database, tmp_path) as first:
+        configure(first)
+        created = create(first, {"title": ORIGINAL_TITLE})
+        task_id = str(created.json()["task"]["task_id"])
+        completed = lifecycle(
+            first, "POST", f"{TASKS_ROUTE}/{task_id}/completion"
+        )
+        with httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:
+            edited = client.put(
+                f"{first}{TASKS_ROUTE}/{task_id}/observations",
+                json={"observations": OBSERVATIONS},
+                headers={"Operation-Id": str(uuid4())},
+            )
+    with running_server(database, tmp_path) as second:
+        survivor = only_task(second)
+
+    assert edited.status_code == 200
+    assert survivor == edited.json()["task"]
+    assert survivor["observations"] == OBSERVATIONS
+    assert survivor["status"] == "completed"
+    assert survivor["completed_at"] == completed.json()["task"]["completed_at"]
+
+
+def test_a_deleted_task_stays_absent_after_a_restart(
+    database: Path, tmp_path: Path
+) -> None:
+    identity = uuid4()
+
+    with running_server(database, tmp_path) as first:
+        configure(first)
+        created = create(first, {"title": ORIGINAL_TITLE})
+        task_id = str(created.json()["task"]["task_id"])
+        deleted = lifecycle(
+            first, "DELETE", f"{TASKS_ROUTE}/{task_id}", identity
+        )
+    with running_server(database, tmp_path) as second:
+        remaining = read(second, TASKS_ROUTE).json()["items"]
+        consulted = read(second, f"{OPERATIONS_ROUTE}/{identity}")
+
+    assert deleted.status_code == 200
+    assert remaining == []
+    assert consulted.json() == deleted.json()
+    assert consulted.json()["task"]["task_id"] == task_id
+
+
+def test_a_lost_lifecycle_response_is_still_recoverable_afterwards(
+    database: Path, tmp_path: Path
+) -> None:
+    identity = uuid4()
+
+    with running_server(database, tmp_path) as first:
+        configure(first)
+        created = create(first, {"title": ORIGINAL_TITLE})
+        task_id = str(created.json()["task"]["task_id"])
+        original = lifecycle(
+            first, "POST", f"{TASKS_ROUTE}/{task_id}/completion", identity
+        )
+    with running_server(database, tmp_path) as second:
+        consulted = read(second, f"{OPERATIONS_ROUTE}/{identity}")
+        repeated = lifecycle(
+            second, "POST", f"{TASKS_ROUTE}/{task_id}/completion", identity
+        )
+        survivor = only_task(second)
+
+    assert consulted.json() == original.json()
+    assert repeated.json() == original.json()
+    assert survivor["completed_at"] == original.json()["task"]["completed_at"]

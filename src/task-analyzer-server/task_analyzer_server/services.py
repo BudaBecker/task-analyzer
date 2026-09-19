@@ -2,7 +2,8 @@
 
 Covers PCE-01 through PCE-16, PCE-27 through PCE-31, PCE-35, PCE-37 through
 PCE-43, PCE-48, PCE-51 and PCE-52 (REQ-007, REQ-008, REQ-010, REQ-028,
-REQ-029, REQ-031).
+REQ-029, REQ-031) and the lifecycle commands TLD-01 through TLD-34
+(REQ-009, REQ-025, REQ-030).
 """
 
 from __future__ import annotations
@@ -28,22 +29,29 @@ from task_analyzer_server.contracts import (
     TaskListView,
     TaskSnapshot,
     ValidationIssue,
+    parse_empty_command,
+    parse_observations_input,
     parse_task_input,
 )
-from task_analyzer_server.domain import title_key, validate_task
+from task_analyzer_server.domain import (
+    title_key,
+    validate_observations,
+    validate_task,
+)
 from task_analyzer_server.settings import ServerSettings
 
 API_VERSION = "v1"
 CANONICAL_SEPARATOR = "|"
 
 CREATED_STATUS = 201
-EDITED_STATUS = 200
+ACCEPTED_STATUS = 200
 NOT_FOUND_STATUS = 404
 STATE_INCOMPATIBLE_STATUS = 409
 UNIQUENESS_CONFLICT_STATUS = 409
 VALIDATION_FAILED_STATUS = 422
 
 PENDING_STATUS = "pending"
+COMPLETED_STATUS = "completed"
 
 OperationCommand = Callable[
     [sqlite3.Connection, OperationRequest], OperationResult
@@ -124,6 +132,76 @@ def edit_task(
     ) -> OperationResult:
         """Apply the edit inside the open write transaction."""
         return _apply_edit(connection, submitted, clock, task_id)
+
+    return apply_operation(settings, request, command)
+
+
+def complete_task(
+    settings: ServerSettings,
+    clock: Clock,
+    request: OperationRequest,
+    task_id: UUID,
+) -> OperationResult:
+    """Complete one pending task."""
+
+    def command(
+        connection: sqlite3.Connection, submitted: OperationRequest
+    ) -> OperationResult:
+        """Apply the completion inside the open write transaction."""
+        return _apply_completion(connection, submitted, clock, task_id)
+
+    return apply_operation(settings, request, command)
+
+
+def edit_completed_observations(
+    settings: ServerSettings,
+    clock: Clock,
+    request: OperationRequest,
+    task_id: UUID,
+) -> OperationResult:
+    """Replace the observations of one completed task."""
+
+    def command(
+        connection: sqlite3.Connection, submitted: OperationRequest
+    ) -> OperationResult:
+        """Apply the observation edit inside the write transaction."""
+        return _apply_completed_observations(
+            connection, submitted, clock, task_id
+        )
+
+    return apply_operation(settings, request, command)
+
+
+def reopen_task(
+    settings: ServerSettings,
+    clock: Clock,
+    request: OperationRequest,
+    task_id: UUID,
+) -> OperationResult:
+    """Return one completed task to the pending state."""
+
+    def command(
+        connection: sqlite3.Connection, submitted: OperationRequest
+    ) -> OperationResult:
+        """Apply the reopening inside the open write transaction."""
+        return _apply_reopening(connection, submitted, clock, task_id)
+
+    return apply_operation(settings, request, command)
+
+
+def delete_task(
+    settings: ServerSettings,
+    clock: Clock,
+    request: OperationRequest,
+    task_id: UUID,
+) -> OperationResult:
+    """Remove one managed task from the collection."""
+
+    def command(
+        connection: sqlite3.Connection, submitted: OperationRequest
+    ) -> OperationResult:
+        """Apply the deletion inside the open write transaction."""
+        return _apply_deletion(connection, submitted, clock, task_id)
 
     return apply_operation(settings, request, command)
 
@@ -297,7 +375,157 @@ def _apply_edit(
         if collided is None:
             raise
         return _conflict_rejection(request, clock, collided)
-    return _success(request, clock.now(), EDITED_STATUS, stored)
+    return _success(request, clock.now(), ACCEPTED_STATUS, stored)
+
+
+def _apply_completion(
+    connection: sqlite3.Connection,
+    request: OperationRequest,
+    clock: Clock,
+    task_id: UUID,
+) -> OperationResult:
+    """Settle one completion attempt inside the write transaction."""
+    require_product_time_zone(connection)
+    issues = _accepted_empty_command(request.payload)
+    if issues:
+        return _validation_rejection(request, clock, issues)
+    target = _eligible_target(connection, task_id, PENDING_STATUS)
+    if isinstance(target, OperationError):
+        return _state_rejection(request, clock, target)
+    # Completing never widens a uniqueness population: the dated index
+    # ignores status, and the undated index covers only pending rows.
+    now = clock.now()
+    stored = storage.complete_task(
+        connection, task_id=task_id, completed_at=now
+    )
+    return _success(request, now, ACCEPTED_STATUS, stored)
+
+
+def _apply_completed_observations(
+    connection: sqlite3.Connection,
+    request: OperationRequest,
+    clock: Clock,
+    task_id: UUID,
+) -> OperationResult:
+    """Settle one completed-observation edit inside the transaction."""
+    require_product_time_zone(connection)
+    try:
+        accepted = parse_observations_input(request.payload)
+    except TaskInputError as failure:
+        return _validation_rejection(request, clock, failure.issues)
+    issues = validate_observations(accepted.observations)
+    if issues:
+        return _validation_rejection(request, clock, issues)
+    target = _eligible_target(connection, task_id, COMPLETED_STATUS)
+    if isinstance(target, OperationError):
+        return _state_rejection(request, clock, target)
+    stored = storage.replace_observations(
+        connection, task_id=task_id, observations=accepted.observations
+    )
+    return _success(request, clock.now(), ACCEPTED_STATUS, stored)
+
+
+def _apply_reopening(
+    connection: sqlite3.Connection,
+    request: OperationRequest,
+    clock: Clock,
+    task_id: UUID,
+) -> OperationResult:
+    """Settle one reopening attempt inside the write transaction."""
+    require_product_time_zone(connection)
+    issues = _accepted_empty_command(request.payload)
+    if issues:
+        return _validation_rejection(request, clock, issues)
+    target = _eligible_target(connection, task_id, COMPLETED_STATUS)
+    if isinstance(target, OperationError):
+        return _state_rejection(request, clock, target)
+    key = title_key(target.title)
+    conflict = storage.find_conflicting_task(
+        connection,
+        title_key=key,
+        deadline=target.deadline,
+        excluded_task_id=task_id,
+    )
+    if conflict is not None:
+        return _conflict_rejection(request, clock, conflict)
+    try:
+        stored = storage.reopen_task(connection, task_id=task_id)
+    except sqlite3.IntegrityError:
+        # The undated pending index backs up the check above; see the
+        # matching note in the creation command.
+        collided = storage.find_conflicting_task(
+            connection,
+            title_key=key,
+            deadline=target.deadline,
+            excluded_task_id=task_id,
+        )
+        if collided is None:
+            raise
+        return _conflict_rejection(request, clock, collided)
+    return _success(request, clock.now(), ACCEPTED_STATUS, stored)
+
+
+def _apply_deletion(
+    connection: sqlite3.Connection,
+    request: OperationRequest,
+    clock: Clock,
+    task_id: UUID,
+) -> OperationResult:
+    """Settle one deletion attempt inside the write transaction."""
+    require_product_time_zone(connection)
+    issues = _accepted_empty_command(request.payload)
+    if issues:
+        return _validation_rejection(request, clock, issues)
+    target = storage.read_task(connection, task_id)
+    if target is None:
+        return _rejection(
+            request,
+            clock.now(),
+            NOT_FOUND_STATUS,
+            OperationError(code=ErrorCode.TASK_NOT_FOUND),
+        )
+    storage.delete_task(connection, task_id=task_id)
+    # The result carries the snapshot read before the flag made the task
+    # unmanaged, so a lost response stays distinguishable from an
+    # attempt against a task that was never there.
+    return _success(request, clock.now(), ACCEPTED_STATUS, target)
+
+
+def _eligible_target(
+    connection: sqlite3.Connection,
+    task_id: UUID,
+    required_status: str,
+) -> TaskSnapshot | OperationError:
+    """Read the task a lifecycle command may act on, or say why not."""
+    target = storage.read_task(connection, task_id)
+    if target is None:
+        return OperationError(code=ErrorCode.TASK_NOT_FOUND)
+    if target.status != required_status:
+        return OperationError(code=ErrorCode.TASK_STATE_INCOMPATIBLE)
+    return target
+
+
+def _state_rejection(
+    request: OperationRequest, clock: Clock, error: OperationError
+) -> OperationResult:
+    """Build the durable rejection of an unavailable or wrong state."""
+    status = (
+        NOT_FOUND_STATUS
+        if error.code is ErrorCode.TASK_NOT_FOUND
+        else STATE_INCOMPATIBLE_STATUS
+    )
+    return _rejection(request, clock.now(), status, error)
+
+
+def _accepted_empty_command(
+    payload: object,
+) -> tuple[ValidationIssue, ...]:
+    """Apply the no-field payload contract of a lifecycle command."""
+    try:
+        parse_empty_command(payload)
+    except TaskInputError as failure:
+        return failure.issues
+    return ()
 
 
 def _accepted_input(
