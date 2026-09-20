@@ -1,6 +1,7 @@
 """Integration tests for concurrency and injected failures.
 
-Covers PCE-19, PCE-20, PCE-27, PCE-37, PCE-39, PCE-42, PCE-43; REQ-010,
+Covers PCE-19, PCE-20, PCE-27, PCE-37, PCE-39, PCE-42, PCE-43 and the
+overlapping lifecycle commands TLD-33 and TLD-34; REQ-008, REQ-010,
 REQ-029, REQ-031.
 """
 
@@ -44,6 +45,10 @@ COMMITTED_EXIT_CODE = 9
 
 COUNT_TASKS = "SELECT COUNT(*) FROM tasks WHERE is_deleted = 0"
 COUNT_RESULTS = "SELECT COUNT(*) FROM operation_results"
+READ_LIFECYCLE_STATE = (
+    "SELECT status, latest_completed_at_us, is_deleted FROM tasks"
+    " WHERE task_id = ?"
+)
 
 HOLDER_PROGRAM = '''"""Hold one uncommitted write transaction open.
 
@@ -156,6 +161,75 @@ def creation(operation_id: UUID, payload: object) -> OperationRequest:
         target=TASKS_TARGET,
         payload=payload,
     )
+
+
+def existing_task(settings: ServerSettings, title: str = TASK_TITLE) -> UUID:
+    result = services.create_task(
+        settings, FixedClock(SERVER_NOW), creation(uuid4(), {"title": title})
+    )
+    assert result.task is not None
+    return result.task.task_id
+
+
+def completed_task(settings: ServerSettings) -> UUID:
+    task_id = existing_task(settings)
+    assert (
+        services.complete_task(
+            settings,
+            FixedClock(SERVER_NOW),
+            lifecycle(uuid4(), "POST", f"{TASKS_TARGET}/{task_id}/completion"),
+            task_id,
+        ).outcome
+        == "succeeded"
+    )
+    return task_id
+
+
+def lifecycle(
+    operation_id: UUID, method: str, target: str
+) -> OperationRequest:
+    return OperationRequest(
+        operation_id=operation_id,
+        method=method,
+        target=target,
+        payload={},
+    )
+
+
+def completion(settings: ServerSettings, task_id: UUID) -> OperationResult:
+    return services.complete_task(
+        settings,
+        FixedClock(SERVER_NOW),
+        lifecycle(uuid4(), "POST", f"{TASKS_TARGET}/{task_id}/completion"),
+        task_id,
+    )
+
+
+def reopening(settings: ServerSettings, task_id: UUID) -> OperationResult:
+    return services.reopen_task(
+        settings,
+        FixedClock(SERVER_NOW),
+        lifecycle(uuid4(), "POST", f"{TASKS_TARGET}/{task_id}/reopening"),
+        task_id,
+    )
+
+
+def deletion(settings: ServerSettings, task_id: UUID) -> OperationResult:
+    return services.delete_task(
+        settings,
+        FixedClock(SERVER_NOW),
+        lifecycle(uuid4(), "DELETE", f"{TASKS_TARGET}/{task_id}"),
+        task_id,
+    )
+
+
+def lifecycle_state(database: Path, task_id: UUID) -> tuple[object, ...]:
+    with storage.open_connection(database, BUSY_TIMEOUT_MS) as connection:
+        row = connection.execute(
+            READ_LIFECYCLE_STATE, (str(task_id),)
+        ).fetchone()
+    assert row is not None
+    return tuple(row)
 
 
 def run_together(
@@ -491,3 +565,110 @@ def test_lookup_during_in_flight_work_is_unknown_not_rejected(
         in_flight = services.lookup_operation(settings, identity)
 
     assert in_flight is None
+
+
+def test_two_completions_accept_one_and_refuse_the_other(
+    settings: ServerSettings, database: Path
+) -> None:
+    task_id = existing_task(settings)
+
+    outcomes = run_together(
+        lambda: completion(settings, task_id),
+        lambda: completion(settings, task_id),
+    )
+    accepted, rejected = accepted_and_rejected(outcomes)
+
+    assert accepted.original_http_status == 200
+    assert rejected.original_http_status == 409
+    assert rejected.error is not None
+    assert rejected.error.code == ErrorCode.TASK_STATE_INCOMPATIBLE
+    assert lifecycle_state(database, task_id)[0] == "completed"
+
+
+def test_two_deletions_accept_one_and_report_the_task_absent(
+    settings: ServerSettings, database: Path
+) -> None:
+    task_id = existing_task(settings)
+
+    outcomes = run_together(
+        lambda: deletion(settings, task_id),
+        lambda: deletion(settings, task_id),
+    )
+    accepted, rejected = accepted_and_rejected(outcomes)
+
+    assert accepted.original_http_status == 200
+    assert rejected.original_http_status == 404
+    assert rejected.error is not None
+    assert rejected.error.code == ErrorCode.TASK_NOT_FOUND
+    assert counted(database, COUNT_TASKS) == 0
+
+
+def test_two_copies_of_one_completion_apply_it_once(
+    settings: ServerSettings, database: Path
+) -> None:
+    task_id = existing_task(settings)
+    identity = uuid4()
+    request = lifecycle(
+        identity, "POST", f"{TASKS_TARGET}/{task_id}/completion"
+    )
+
+    first, second = run_together(
+        lambda: services.complete_task(
+            settings, FixedClock(SERVER_NOW), request, task_id
+        ),
+        lambda: services.complete_task(
+            settings, FixedClock(SERVER_NOW), request, task_id
+        ),
+    )
+
+    assert isinstance(first, OperationResult)
+    assert first == second
+    assert first.outcome == "succeeded"
+    assert services.lookup_operation(settings, identity) == first
+    # One creation and one completion, never a second completion row or
+    # a second ledger entry for the repeated attempt.
+    assert counted(database, COUNT_RESULTS) == 2
+    assert lifecycle_state(database, task_id)[0] == "completed"
+
+
+def test_overlapping_completion_and_reopening_reach_a_valid_state(
+    settings: ServerSettings, database: Path
+) -> None:
+    task_id = completed_task(settings)
+
+    outcomes = run_together(
+        lambda: completion(settings, task_id),
+        lambda: reopening(settings, task_id),
+    )
+    results = [item for item in outcomes if isinstance(item, OperationResult)]
+    status, completed_at, is_deleted = lifecycle_state(database, task_id)
+
+    assert len(results) == 2
+    assert counted(database, COUNT_RESULTS) == 4
+    assert is_deleted == 0
+    # Reopening first leaves a task completed again by the other attempt;
+    # completing first leaves the reopened pending task. Both are whole
+    # states, never a pending task still carrying a completion instant.
+    assert (status == "completed" and completed_at is not None) or (
+        status == "pending" and completed_at is None
+    )
+
+
+def test_a_lifecycle_lock_timeout_establishes_no_terminal_result(
+    settings: ServerSettings, database: Path, tmp_path: Path
+) -> None:
+    task_id = existing_task(settings)
+    impatient = settings_for(database, IMPATIENT_TIMEOUT_MS)
+    identity = uuid4()
+    request = lifecycle(
+        identity, "POST", f"{TASKS_TARGET}/{task_id}/completion"
+    )
+
+    with holding_write_lock(database, tmp_path, uuid4(), uuid4()):
+        with pytest.raises(sqlite3.OperationalError):
+            services.complete_task(
+                impatient, FixedClock(SERVER_NOW), request, task_id
+            )
+
+    assert services.lookup_operation(impatient, identity) is None
+    assert lifecycle_state(database, task_id) == ("pending", None, 0)

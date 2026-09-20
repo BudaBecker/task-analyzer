@@ -42,13 +42,12 @@ Approved product inputs remain in [Requirements](../docs/product/requirements.md
 
 ## Handoff
 
-- **Work**: Project simplification is complete and merged. See [maintenance](../docs/maintenance.md) for results.
-- **Branch**: `main` at the published simplification merge.
-- **Next step**: Agree on the concise delivery 1B boundary, then write its lightweight behavioral specification.
-- **Result**: uv and `.venv` are established; F1-F5 are fixed; active documentation, source commentary and duplicate tests are reduced. The final 393-case suite and quality/build checks pass.
-- **Authorization**: Maintenance was merged and published. Delivery 1B implementation is not yet authorized.
-- **Existing local change**: `.specs/features/.gitkeep` was already deleted before maintenance; preserve it separately from maintenance commits.
-- **External checks**: Actual Ubuntu interpreter/lock and Tailscale access remain pending; local maintenance completion does not claim deployment verification.
+- **Work**: Delivery 1B implemented against its approved [specification](features/task-lifecycle-deletion/spec.md) and [Design delta](features/task-lifecycle-deletion/design.md): completion, completed-observation editing, reopening and deletion.
+- **Branch**: `docs/task-lifecycle-deletion` from published `main`.
+- **Next step**: Review the delivered lifecycle commands, then choose the next feature. Deadline emphasis and productivity analysis are unstarted, and the Windows client remains undecided.
+- **Result**: The four commands reuse the 1A envelope, `BEGIN IMMEDIATE` transaction and operation ledger; no schema change or migration was needed. The suite grew from 393 to 487 cases and the README quality and build checks pass.
+- **Authorization**: The 1B implementation and its local commits are authorized. No push, merge or deployment is.
+- **External checks**: Actual Ubuntu interpreter/lock and Tailscale access remain pending; a passing local suite does not claim target-host or private-access verification.
 
 ## Open questions
 

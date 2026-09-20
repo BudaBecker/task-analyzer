@@ -1,7 +1,8 @@
 """Business rules for submitted task fields.
 
 Covers PCE-01 through PCE-10, PCE-15 through PCE-18, PCE-23, PCE-48, PCE-51
-and PCE-52 (REQ-007, REQ-008, REQ-011, REQ-029).
+and PCE-52 (REQ-007, REQ-008, REQ-011, REQ-029) and the completed-task
+observation rules TLD-10 and TLD-11 (REQ-009).
 """
 
 from __future__ import annotations
@@ -41,6 +42,14 @@ def validate_task(data: TaskInput) -> tuple[ValidationIssue, ...]:
         _deadline_issue(data.deadline),
     )
     return tuple(issue for issue in candidates if issue is not None)
+
+
+def validate_observations(
+    observations: str | None,
+) -> tuple[ValidationIssue, ...]:
+    """Apply the observation rules alone, without title or deadline."""
+    issue = _observations_issue(observations)
+    return () if issue is None else (issue,)
 
 
 def title_key(title: str) -> str:

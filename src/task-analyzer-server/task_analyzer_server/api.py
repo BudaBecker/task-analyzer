@@ -1,7 +1,8 @@
 """HTTP boundary of the Task Analyzer server.
 
 Covers PCE-26, PCE-38, PCE-40 through PCE-43, PCE-46 and PCE-47 (REQ-010,
-REQ-027, REQ-029, REQ-031).
+REQ-027, REQ-029, REQ-031) and the lifecycle routes TLD-01 through TLD-34
+(REQ-008, REQ-009, REQ-025, REQ-030).
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ import json
 import logging
 import math
 import sqlite3
+from collections.abc import Callable
 from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -63,6 +65,10 @@ REFUSAL_STATUS: dict[ErrorCode, int] = {
     ErrorCode.PRODUCT_TIME_ZONE_FIXED: CONFLICT_STATUS,
     ErrorCode.INVALID_TIME_ZONE: UNPROCESSABLE_STATUS,
 }
+
+TaskCommand = Callable[
+    [ServerSettings, Clock, OperationRequest, UUID], OperationResult
+]
 
 router = APIRouter(prefix=API_PREFIX)
 
@@ -136,6 +142,34 @@ async def edit_task(request: Request, task_id: str) -> Response:
     )
 
 
+@router.post("/tasks/{task_id}/completion")
+async def complete_task(request: Request, task_id: str) -> Response:
+    """Complete one pending task."""
+    return await _resolved_command(request, task_id, services.complete_task)
+
+
+@router.put("/tasks/{task_id}/observations")
+async def edit_completed_observations(
+    request: Request, task_id: str
+) -> Response:
+    """Replace the observations of one completed task."""
+    return await _resolved_command(
+        request, task_id, services.edit_completed_observations
+    )
+
+
+@router.post("/tasks/{task_id}/reopening")
+async def reopen_task(request: Request, task_id: str) -> Response:
+    """Return one completed task to the pending state."""
+    return await _resolved_command(request, task_id, services.reopen_task)
+
+
+@router.delete("/tasks/{task_id}")
+async def delete_task(request: Request, task_id: str) -> Response:
+    """Remove one managed task from the collection."""
+    return await _resolved_command(request, task_id, services.delete_task)
+
+
 @router.get("/tasks")
 def read_tasks(request: Request) -> Response:
     """Publish every managed task with the context of one reading."""
@@ -201,6 +235,26 @@ async def _submitted_operation(request: Request) -> OperationRequest:
         method=request.method,
         target=request.url.path,
         payload=payload,
+    )
+
+
+async def _resolved_command(
+    request: Request, task_id: str, command: TaskCommand
+) -> Response:
+    """Resolve one lifecycle command against one identified task."""
+    timer = DurationTimer()
+    submitted = await _submitted_operation(request)
+    target = _usable_identity(task_id)
+    return _resolved(
+        request,
+        await run_in_threadpool(
+            command,
+            _settings_of(request),
+            _clock_of(request),
+            submitted,
+            target,
+        ),
+        timer,
     )
 
 

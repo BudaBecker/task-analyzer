@@ -1,7 +1,8 @@
 """SQLite access for the Task Analyzer server.
 
 Covers PCE-11 through PCE-14, PCE-19 through PCE-25, PCE-29 and PCE-35
-through PCE-43 (REQ-008, REQ-010, REQ-028, REQ-029, REQ-031).
+through PCE-43 (REQ-008, REQ-010, REQ-028, REQ-029, REQ-031) and the
+lifecycle mutations TLD-01 through TLD-27 (REQ-009, REQ-025, REQ-030).
 """
 
 from __future__ import annotations
@@ -55,6 +56,20 @@ INSERT_TASK = (
 UPDATE_TASK = (
     "UPDATE tasks SET title = ?, title_key = ?, observations = ?,"
     " deadline_date = ? WHERE task_id = ? AND is_deleted = 0"
+)
+COMPLETE_TASK = (
+    "UPDATE tasks SET status = 'completed', latest_completed_at_us = ?"
+    " WHERE task_id = ? AND is_deleted = 0"
+)
+REPLACE_OBSERVATIONS = (
+    "UPDATE tasks SET observations = ? WHERE task_id = ? AND is_deleted = 0"
+)
+REOPEN_TASK = (
+    "UPDATE tasks SET status = 'pending', latest_completed_at_us = NULL"
+    " WHERE task_id = ? AND is_deleted = 0"
+)
+DELETE_TASK = (
+    "UPDATE tasks SET is_deleted = 1 WHERE task_id = ? AND is_deleted = 0"
 )
 READ_TASK = (
     "SELECT task_id, title, observations, deadline_date, status,"
@@ -215,6 +230,52 @@ def update_task(
         ),
     )
     return _require_task(connection, task_id)
+
+
+def complete_task(
+    connection: sqlite3.Connection,
+    *,
+    task_id: UUID,
+    completed_at: datetime,
+) -> TaskSnapshot:
+    """Mark one managed task completed at the sampled instant."""
+    connection.execute(
+        COMPLETE_TASK, (to_utc_microseconds(completed_at), str(task_id))
+    )
+    return _require_task(connection, task_id)
+
+
+def replace_observations(
+    connection: sqlite3.Connection,
+    *,
+    task_id: UUID,
+    observations: str | None,
+) -> TaskSnapshot:
+    """Replace only the observations of one managed task."""
+    connection.execute(REPLACE_OBSERVATIONS, (observations, str(task_id)))
+    return _require_task(connection, task_id)
+
+
+def reopen_task(
+    connection: sqlite3.Connection, *, task_id: UUID
+) -> TaskSnapshot:
+    """Return one managed task to pending and clear its completion."""
+    connection.execute(REOPEN_TASK, (str(task_id),))
+    return _require_task(connection, task_id)
+
+
+def delete_task(connection: sqlite3.Connection, *, task_id: UUID) -> None:
+    """Remove one task from the managed collection.
+
+    The row stays so its history survives; the flag is what excludes it
+    from managed reads and from the unique partial indexes.
+    """
+    deleted = connection.execute(DELETE_TASK, (str(task_id),)).rowcount
+    if deleted != 1:
+        raise TaskNotStoredError(
+            f"Deleting managed task {task_id} reached {deleted} rows"
+            " instead of one, so its removal cannot be reported."
+        )
 
 
 def read_task(
